@@ -57,8 +57,6 @@ def main():
     job_queue.run_repeating(scheduled_weather, interval=config.scheduled_weather_loop, first=0)
     job_queue.run_repeating(debug_time, interval=config.debug_time_loop, first=0)
 
-    logger.info(f"Job Queue: {job_queue}")
-
     print("Bot is running... Press Ctrl+C to stop")
     try:
         application.run_polling()
