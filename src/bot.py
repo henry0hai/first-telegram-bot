@@ -58,7 +58,6 @@ def main():
     job_queue.run_repeating(debug_time, interval=config.debug_time_loop, first=0)
 
     logger.info(f"Job Queue: {job_queue}")
-    logger.info(f"config: {config}")
 
     print("Bot is running... Press Ctrl+C to stop")
     try:

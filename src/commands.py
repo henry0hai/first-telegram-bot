@@ -13,7 +13,7 @@ from src.scheduler import on_startup, scheduled_weather, debug_time
 
 
 async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    with bot_lock:
+    async with bot_lock:
         user_name = update.message.from_user.username
         if user_name != config.admin_user_name:
             await update.message.reply_text("Sorry, only the admin can stop the bot.")
@@ -48,7 +48,7 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    with bot_lock:
+    async with bot_lock:
         user = update.message.from_user.first_name
 
         if config.is_bot_running:  # Use config.is_bot_running
@@ -70,7 +70,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    with bot_lock:
+    async with bot_lock:
         help_text = """
         Available commands:
         /start - Start the bot
@@ -89,7 +89,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def say(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    with bot_lock:
+    async with bot_lock:
         if context.args:
             message = " ".join(context.args)
             await update.message.reply_text(f"You said: {message}")
@@ -98,13 +98,13 @@ async def say(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def kiemtra(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    with bot_lock:
+    async with bot_lock:
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         await update.message.reply_text(f"Bot is running! Current time: {current_time}")
 
 
 async def cpu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    with bot_lock:
+    async with bot_lock:
         try:
             cpu_percent = psutil.cpu_percent(interval=1)
             await update.message.reply_text(f"CPU Usage: {cpu_percent}%")
@@ -114,7 +114,7 @@ async def cpu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def ram(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    with bot_lock:
+    async with bot_lock:
         try:
             memory = psutil.virtual_memory()
             used = memory.used / (1024 * 1024 * 1024)
@@ -128,7 +128,7 @@ async def ram(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def disk(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    with bot_lock:
+    async with bot_lock:
         try:
             disk = psutil.disk_usage("/")
             used = disk.used / (1024 * 1024 * 1024)
@@ -142,7 +142,7 @@ async def disk(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def weather(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    with bot_lock:
+    async with bot_lock:
         if not context.args:
             await update.message.reply_text(
                 "Please provide a city name after /weather (e.g., /weather London)"
@@ -155,7 +155,7 @@ async def weather(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def uptime(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    with bot_lock:
+    async with bot_lock:
         if config.start_time is None:
             await update.message.reply_text("Bot start time not set!")
             return
@@ -166,7 +166,7 @@ async def uptime(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    with bot_lock:
+    async with bot_lock:
         try:
             # System Info
             os_info = platform.system() + " " + platform.release()

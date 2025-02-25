@@ -1,14 +1,12 @@
 # src/config.py
 import os
-import threading
+from asyncio import Lock
 from dotenv import load_dotenv
+import logging
+from logging.handlers import RotatingFileHandler
 
 # Load .env file
 load_dotenv()
-
-# Logging setup
-import logging
-
 
 # Environment variables
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -39,10 +37,9 @@ ICON_WIND, ICON_TEMP, ICON_HUMIDITY = "💨", "🌡️", "💧"
 ICON_SUNRISE, ICON_SUNSET, ICON_TIME = "🌅", "🌇", "🕒"
 
 # Global state
-START_TIME = None  # Will be set in bot.py
-
-DEBUG_TIME_LOOP = 1800 # 30 minutes
-SCHEDULED_WEATHER_LOOP = 7200 # 2 hours
+START_TIME = None
+DEBUG_TIME_LOOP = 1800  # 30 minutes
+SCHEDULED_WEATHER_LOOP = 7200  # 2 hours
 
 class BotConfig:
     def __init__(self):
@@ -58,14 +55,28 @@ class BotConfig:
         self.debug_time_loop = DEBUG_TIME_LOOP
         self.scheduled_weather_loop = SCHEDULED_WEATHER_LOOP
 
-
 config = BotConfig()
 
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
-)
-logger = logging.getLogger(__name__)
+# Logging setup with file handler
+log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
+os.makedirs(log_dir, exist_ok=True)  # Use exist_ok to avoid race conditions
 
-is_bot_running = False
-job_queue = None
-bot_lock = threading.Lock()
+log_file = os.path.join(log_dir, "telegram_bot.log")
+handler = RotatingFileHandler(log_file, maxBytes=5 * 1024 * 1024, backupCount=2)
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+handler.setFormatter(formatter)
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+logger.addHandler(handler)
+
+# Optional console output
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
+
+# Bot state (avoid global variables where possible)
+bot_lock = Lock()  # Keep it as asyncio.Lock for async compatibility
+
+# Test log to confirm setup
+logger.info("Logging initialized!")
