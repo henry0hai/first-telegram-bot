@@ -1,0 +1,16 @@
+services:
+  telegram-bot:
+    build:
+      context: .  # Build from the current directory (where Dockerfile is)
+      dockerfile: Dockerfile
+    container_name: telegram-bot
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - ADMIN_ID=${ADMIN_ID}
+      - ADMIN_USER_NAME=${ADMIN_USER_NAME}
+      - WEATHER_API_KEY=${WEATHER_API_KEY}
+    volumes:
+      - ./logs:/app/logs  # Persist logs outside the container
+    restart: unless-stopped  # Restart unless explicitly stopped
+    env_file:
+      - .env  # Load environment variables from .env file
