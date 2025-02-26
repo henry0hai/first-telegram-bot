@@ -29,7 +29,9 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if response is not None and response.strip():  # Check for None and empty strings
         await update.message.reply_text(response)
     elif response is not None:
-        logger.warning(f"Empty response received for input '{user_input}' from {username} ({user_id})")
+        logger.warning(
+            f"Empty response received for input '{user_input}' from {username} ({user_id})"
+        )
 
     # Log bot response (optional, when database is ready)
     # log_to_database(user_id, username, f"Bot response: {response}", is_bot=True)
@@ -48,7 +50,7 @@ async def run_command(update: Update, func, error_message="Error occurred"):
 
 
 # Command implementations
-async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE, params=None):
     async with bot_lock:
         user_name = update.message.from_user.username
         if user_name != config.admin_user_name:
@@ -83,7 +85,7 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("All scheduled activities have been stopped.")
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, params=None):
     async with bot_lock:
         user = update.message.from_user.first_name
         if config.is_bot_running:
@@ -126,7 +128,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(help_text)
 
 
-async def say(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def say(update: Update, context: ContextTypes.DEFAULT_TYPE, params=None):
     async with bot_lock:
         if context.args:
             message = " ".join(context.args)
@@ -135,13 +137,13 @@ async def say(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("Please provide a message after /say")
 
 
-async def kiemtra(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def kiemtra(update: Update, context: ContextTypes.DEFAULT_TYPE, params=None):
     async with bot_lock:
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         await update.message.reply_text(f"Bot is running! Current time: {current_time}")
 
 
-async def cpu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def cpu(update: Update, context: ContextTypes.DEFAULT_TYPE, params=None):
     async with bot_lock:
         cpu_percent = await run_command(
             update, lambda: get_cpu_usage(interval=1), "Error getting CPU usage"
@@ -150,7 +152,7 @@ async def cpu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"CPU Usage: {cpu_percent}%")
 
 
-async def ram(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def ram(update: Update, context: ContextTypes.DEFAULT_TYPE, params=None):
     async with bot_lock:
         result = await run_command(update, get_ram_usage, "Error getting RAM usage")
         if result:
@@ -160,7 +162,7 @@ async def ram(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
 
-async def disk(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def disk(update: Update, context: ContextTypes.DEFAULT_TYPE, params=None):
     async with bot_lock:
         result = await run_command(update, get_disk_usage, "Error getting disk usage")
         if result:
@@ -170,20 +172,23 @@ async def disk(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
 
-async def weather(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def weather(update: Update, context: ContextTypes.DEFAULT_TYPE, params=None):
     async with bot_lock:
-        if not context.args:
+        if params:
+            city = params
+        elif context.args:
+            city = " ".join(context.args)
+        else:
             await update.message.reply_text(
-                "Please provide a city name after /weather (e.g., /weather London)"
+                "🌦️ Please provide a city name (e.g., 'weather London' or '/weather London')"
             )
             return
-        city = " ".join(context.args)
         weather_info = await get_weather(city)
         if weather_info:
             await update.message.reply_text(weather_info, parse_mode="Markdown")
 
 
-async def uptime(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def uptime(update: Update, context: ContextTypes.DEFAULT_TYPE, params=None):
     async with bot_lock:
         uptime_str = get_uptime()
         if uptime_str is None:
@@ -192,7 +197,7 @@ async def uptime(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"Bot uptime: {uptime_str}")
 
 
-async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def info(update: Update, context: ContextTypes.DEFAULT_TYPE, params=None):
     async with bot_lock:
         # System Info
         system_result = await run_command(
