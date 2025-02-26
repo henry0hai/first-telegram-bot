@@ -40,7 +40,11 @@ async def process_with_ai(user_input, update=None, context=None):
         if user_id in conversation_history:
             del conversation_history[user_id]
             logger.info(f"Cleared conversation history for user {username} ({user_id})")
-        return "🧹 Conversation cleared! Let's start fresh."
+    
+        if user_id in accuracy_data:
+            del accuracy_data[user_id]
+            logger.info(f"Cleared all accuracy_data history for user {username} ({user_id})")
+        return "🧹 All data cleared! Let's start fresh."
 
     # Initialize user data if not present
     if user_id and user_id not in conversation_history:
