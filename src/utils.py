@@ -5,7 +5,7 @@ import psutil
 import requests
 import platform
 from datetime import datetime
-from src.config import config, bot_lock, logger
+from src.config import config, logger
 from src.config import WEATHER_API_KEY, WEATHER_BASE_URL, WEATHER_ICONS, logger
 from src.config import (
     ICON_WIND,

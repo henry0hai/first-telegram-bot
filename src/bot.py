@@ -1,6 +1,12 @@
 # src/bot.py
 import fcntl
-from telegram.ext import ApplicationBuilder, CommandHandler
+
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    filters
+)
 from src.config import config, logger
 from src.commands import (
     start,
@@ -14,6 +20,7 @@ from src.commands import (
     weather,
     uptime,
     info,
+    handle_text
 )
 from src.scheduler import on_startup, scheduled_weather, debug_time
 from src.lock import ensure_single_instance
@@ -52,9 +59,16 @@ def main():
     application.add_handler(CommandHandler("info", info))
     application.add_error_handler(error_handler)
 
+    # New text handler for non-command messages
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text)
+    )
+
     # Initial scheduling
     job_queue.run_once(on_startup, 0)
-    job_queue.run_repeating(scheduled_weather, interval=config.scheduled_weather_loop, first=0)
+    job_queue.run_repeating(
+        scheduled_weather, interval=config.scheduled_weather_loop, first=0
+    )
     job_queue.run_repeating(debug_time, interval=config.debug_time_loop, first=0)
 
     print("Bot is running... Press Ctrl+C to stop")

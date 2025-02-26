@@ -16,6 +16,7 @@ ADMIN_USER_NAME = os.getenv("ADMIN_USER_NAME")
 WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 WEATHER_BASE_URL = "http://api.openweathermap.org/data/2.5/weather"
 CITIES = os.getenv("CITIES", "").split(",")
+HF_API_KEY = os.getenv("HF_API_KEY")
 
 # Validate environment variables
 if not all([TELEGRAM_BOT_TOKEN, ADMIN_ID, WEATHER_API_KEY, CITIES]):
@@ -53,6 +54,7 @@ class BotConfig:
         self.weather_api_key = WEATHER_API_KEY
         self.weather_base_url = WEATHER_BASE_URL
         self.cities = CITIES
+        self.hf_key_api = HF_API_KEY
         self.debug_time_loop = DEBUG_TIME_LOOP
         self.scheduled_weather_loop = SCHEDULED_WEATHER_LOOP
         self.app_version = VERSION

@@ -1,7 +1,4 @@
 # src/commands.py
-import time
-import psutil
-import platform
 from telegram import Update
 from datetime import datetime
 from telegram.ext import ContextTypes
@@ -11,10 +8,31 @@ from src.utils import (
     get_ram_usage,
     get_disk_usage,
     get_sys_info,
-    get_uptime
+    get_uptime,
 )
 from src.config import config, bot_lock, logger
 from src.scheduler import on_startup, scheduled_weather, debug_time
+from src.ai import process_with_ai
+
+
+# New handler for non-command text
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_input = update.message.text
+    user_id = update.message.from_user.id
+    username = update.message.from_user.username or "Unknown"
+
+    # Log user input (when database is ready)
+    # log_to_database(user_id, username, user_input)
+
+    # Process with AI
+    response = await process_with_ai(user_input, update, context)
+    if response is not None and response.strip():  # Check for None and empty strings
+        await update.message.reply_text(response)
+    elif response is not None:
+        logger.warning(f"Empty response received for input '{user_input}' from {username} ({user_id})")
+
+    # Log bot response (optional, when database is ready)
+    # log_to_database(user_id, username, f"Bot response: {response}", is_bot=True)
 
 
 # Generic async command wrapper for error handling
@@ -214,7 +232,7 @@ async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"💻 <b>OS:</b> {os_info}\n"
             f"🐍 <b>Python:</b> {python_version}\n"
             f"🧠 <b>CPU Cores:</b> {cpu_count}\n\n"
-            f"⏰ <b>Uptime:</b> {uptime_str if uptime_str else 'Not available'}\n" 
+            f"⏰ <b>Uptime:</b> {uptime_str if uptime_str else 'Not available'}\n"
             f"\n"
             "<b>Resource Usage</b> ⚙️\n"
             f"📈 <b>CPU:</b> {cpu_percent}% (over 3s)\n"
