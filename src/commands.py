@@ -10,10 +10,13 @@ from src.utils import (
     get_sys_info,
     get_uptime,
 )
-from src.config import config, bot_lock, logger
+from src.config import config, bot_lock
 from src.scheduler import on_startup, scheduled_weather, debug_time
 from src.ai import process_with_ai
 
+
+from src.logging_utils import get_logger  
+logger = get_logger(__name__)
 
 # New handler for non-command text
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):

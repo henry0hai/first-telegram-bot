@@ -1,6 +1,9 @@
 # src/ai.py
 from huggingface_hub import InferenceClient
-from src.config import config, logger
+from src.config import config
+
+from src.logging_utils import get_logger  
+logger = get_logger(__name__)
 
 # Initialize the Hugging Face Inference Client
 client = InferenceClient(api_key=config.hf_key_api)

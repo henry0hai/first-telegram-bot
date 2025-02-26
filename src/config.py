@@ -3,8 +3,7 @@ import os
 from asyncio import Lock
 from dotenv import load_dotenv
 from src.__version__ import VERSION
-import logging
-from logging.handlers import RotatingFileHandler
+from src.logging_utils import get_logger
 
 # Load .env file
 load_dotenv()
@@ -61,26 +60,9 @@ class BotConfig:
 
 config = BotConfig()
 
-# Logging setup with file handler
-log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
-os.makedirs(log_dir, exist_ok=True)  # Use exist_ok to avoid race conditions
-
-log_file = os.path.join(log_dir, "telegram_bot.log")
-handler = RotatingFileHandler(log_file, maxBytes=5 * 1024 * 1024, backupCount=2)
-formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-handler.setFormatter(formatter)
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-logger.addHandler(handler)
-
-# Optional console output
-console_handler = logging.StreamHandler()
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
-
 # Bot state (avoid global variables where possible)
 bot_lock = Lock()  # Keep it as asyncio.Lock for async compatibility
 
 # Test log to confirm setup
+logger = get_logger(__name__)
 logger.info("Logging initialized!")

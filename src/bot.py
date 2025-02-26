@@ -1,4 +1,5 @@
 # src/bot.py
+import time
 import fcntl
 
 from telegram.ext import (
@@ -7,7 +8,7 @@ from telegram.ext import (
     MessageHandler,
     filters
 )
-from src.config import config, logger
+from src.config import config
 from src.commands import (
     start,
     stop,
@@ -24,7 +25,9 @@ from src.commands import (
 )
 from src.scheduler import on_startup, scheduled_weather, debug_time
 from src.lock import ensure_single_instance
-import time
+
+from src.logging_utils import get_logger  
+logger = get_logger(__name__)
 
 
 def error_handler(update, context):

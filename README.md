@@ -15,6 +15,7 @@ first-telegram-bot/
 │   ├── commands.py        # Command handlers
 │   ├── scheduler.py       # Scheduled tasks (weather updates, debug time)
 │   ├── utils.py           # Utility functions (weather fetching, direction conversion)
+│   ├── logging_utils.py   # Handle logging
 │   └── lock.py            # Single-instance lock logic
 │
 ├── sample.env             # Sample Environment variables file

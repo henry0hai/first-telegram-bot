@@ -1,8 +1,9 @@
 # src/lock.py
 import sys
 import fcntl
-from src.config import logger
 
+from src.logging_utils import get_logger  
+logger = get_logger(__name__)
 
 def ensure_single_instance(lock_file_path="/tmp/telegram_bot.lock"):
     """

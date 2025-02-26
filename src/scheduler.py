@@ -1,8 +1,11 @@
 # src/scheduler.py
 from telegram.ext import ContextTypes
-from src.config import ADMIN_ID, CITIES, bot_lock, logger
+from src.config import ADMIN_ID, CITIES, bot_lock
 from src.utils import get_weather
 from datetime import datetime
+
+from src.logging_utils import get_logger  
+logger = get_logger(__name__)
 
 
 async def on_startup(context: ContextTypes.DEFAULT_TYPE, user=None):

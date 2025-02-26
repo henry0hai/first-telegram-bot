@@ -5,9 +5,11 @@ import psutil
 import requests
 import platform
 from datetime import datetime
-from src.config import config, logger
-from src.config import WEATHER_API_KEY, WEATHER_BASE_URL, WEATHER_ICONS, logger
 from src.config import (
+    config,
+    WEATHER_API_KEY,
+    WEATHER_BASE_URL,
+    WEATHER_ICONS,
     ICON_WIND,
     ICON_TEMP,
     ICON_HUMIDITY,
@@ -15,6 +17,10 @@ from src.config import (
     ICON_SUNSET,
     ICON_TIME,
 )
+
+from src.logging_utils import get_logger
+
+logger = get_logger(__name__)
 
 
 def degrees_to_direction(deg):
@@ -132,6 +138,7 @@ def get_sys_info():
     python_version = platform.python_version()
     cpu_count = psutil.cpu_count()
     return os_info, python_version, cpu_count
+
 
 def get_uptime():
     """Calculate and return formatted uptime or None if start_time is not set."""
