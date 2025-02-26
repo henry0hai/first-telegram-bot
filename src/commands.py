@@ -2,16 +2,34 @@
 import time
 import psutil
 import platform
-
 from telegram import Update
-from functools import partial
 from datetime import datetime
-from src.utils import get_weather
 from telegram.ext import ContextTypes
+from src.utils import (
+    get_weather,
+    get_cpu_usage,
+    get_ram_usage,
+    get_disk_usage,
+    get_sys_info,
+    get_uptime
+)
 from src.config import config, bot_lock, logger
 from src.scheduler import on_startup, scheduled_weather, debug_time
 
 
+# Generic async command wrapper for error handling
+async def run_command(update: Update, func, error_message="Error occurred"):
+    """Wrapper to handle exceptions in async commands."""
+    try:
+        result = func()
+        return result
+    except Exception as e:
+        await update.message.reply_text(f"{error_message}: {str(e)}")
+        logger.error(f"{error_message}: {str(e)}")
+        return None
+
+
+# Command implementations
 async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     async with bot_lock:
         user_name = update.message.from_user.username
@@ -50,8 +68,7 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     async with bot_lock:
         user = update.message.from_user.first_name
-
-        if config.is_bot_running:  # Use config.is_bot_running
+        if config.is_bot_running:
             message = f"Hello {user}! The bot is already running. Use /help to see available commands."
             await update.message.reply_text(message)
             return
@@ -60,13 +77,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(message)
 
         if config.job_queue:
-            # Pass user via context.job_data instead of partial
             config.job_queue.run_once(on_startup, 0, data={"user": user})
-            config.job_queue.run_repeating(scheduled_weather, interval=config.scheduled_weather_loop, first=0)
-            config.job_queue.run_repeating(debug_time, interval=config.debug_time_loop, first=0)
+            config.job_queue.run_repeating(
+                scheduled_weather, interval=config.scheduled_weather_loop, first=0
+            )
+            config.job_queue.run_repeating(
+                debug_time, interval=config.debug_time_loop, first=0
+            )
             logger.info(f"User {user} restarted all bot activities")
 
-        config.is_bot_running = True  # Use config.is_bot_running
+        config.is_bot_running = True
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -105,40 +125,31 @@ async def kiemtra(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cpu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     async with bot_lock:
-        try:
-            cpu_percent = psutil.cpu_percent(interval=1)
+        cpu_percent = await run_command(
+            update, lambda: get_cpu_usage(interval=1), "Error getting CPU usage"
+        )
+        if cpu_percent is not None:
             await update.message.reply_text(f"CPU Usage: {cpu_percent}%")
-        except Exception as e:
-            await update.message.reply_text(f"Error getting CPU usage: {str(e)}")
-            logger.error(f"CPU command error: {str(e)}")
 
 
 async def ram(update: Update, context: ContextTypes.DEFAULT_TYPE):
     async with bot_lock:
-        try:
-            memory = psutil.virtual_memory()
-            used = memory.used / (1024 * 1024 * 1024)
-            total = memory.total / (1024 * 1024 * 1024)
+        result = await run_command(update, get_ram_usage, "Error getting RAM usage")
+        if result:
+            used, total, percent = result
             await update.message.reply_text(
-                f"RAM Usage: {used:.2f}GB / {total:.2f}GB ({memory.percent}%)"
+                f"RAM Usage: {used:.2f}GB / {total:.2f}GB ({percent}%)"
             )
-        except Exception as e:
-            await update.message.reply_text(f"Error getting RAM usage: {str(e)}")
-            logger.error(f"RAM command error: {str(e)}")
 
 
 async def disk(update: Update, context: ContextTypes.DEFAULT_TYPE):
     async with bot_lock:
-        try:
-            disk = psutil.disk_usage("/")
-            used = disk.used / (1024 * 1024 * 1024)
-            total = disk.total / (1024 * 1024 * 1024)
+        result = await run_command(update, get_disk_usage, "Error getting disk usage")
+        if result:
+            used, total, percent = result
             await update.message.reply_text(
-                f"Disk Usage: {used:.2f}GB / {total:.2f}GB ({disk.percent}%)"
+                f"Disk Usage: {used:.2f}GB / {total:.2f}GB ({percent}%)"
             )
-        except Exception as e:
-            await update.message.reply_text(f"Error getting disk usage: {str(e)}")
-            logger.error(f"Disk command error: {str(e)}")
 
 
 async def weather(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -156,49 +167,59 @@ async def weather(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def uptime(update: Update, context: ContextTypes.DEFAULT_TYPE):
     async with bot_lock:
-        if config.start_time is None:
+        uptime_str = get_uptime()
+        if uptime_str is None:
             await update.message.reply_text("Bot start time not set!")
-            return
-        uptime_seconds = time.time() - config.start_time
-        hours, remainder = divmod(int(uptime_seconds), 3600)
-        minutes, seconds = divmod(remainder, 60)
-        await update.message.reply_text(f"Bot uptime: {hours}h {minutes}m {seconds}s")
+        else:
+            await update.message.reply_text(f"Bot uptime: {uptime_str}")
 
 
 async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     async with bot_lock:
-        try:
-            # System Info
-            os_info = platform.system() + " " + platform.release()
-            python_version = platform.python_version()
-            cpu_count = psutil.cpu_count()
+        # System Info
+        system_result = await run_command(
+            update, get_sys_info, "Error getting system info"
+        )
 
-            # CPU Usage
-            cpu_percent = psutil.cpu_percent(interval=3)
+        # Resource Usage
+        cpu_percent = await run_command(
+            update, lambda: get_cpu_usage(interval=3), "Error getting CPU usage"
+        )
+        ram_result = await run_command(update, get_ram_usage, "Error getting RAM usage")
+        disk_result = await run_command(
+            update, get_disk_usage, "Error getting disk usage"
+        )
 
-            # RAM Usage
-            memory = psutil.virtual_memory()
-            ram_used = memory.used / (1024 * 1024 * 1024)  # Convert to GB
-            ram_total = memory.total / (1024 * 1024 * 1024)  # Convert to GB
+        if (
+            cpu_percent is None
+            or ram_result is None
+            or disk_result is None
+            or system_result is None
+        ):
+            return  # Error messages already sent by run_command
 
-            # Disk Usage
-            disk = psutil.disk_usage("/")
-            disk_used = disk.used / (1024 * 1024 * 1024)  # Convert to GB
-            disk_total = disk.total / (1024 * 1024 * 1024)  # Convert to GB
+        os_info, python_version, cpu_count = system_result
+        ram_used, ram_total, ram_percent = ram_result
+        disk_used, disk_total, disk_percent = disk_result
 
-            # Formatted message with icons (using HTML for better formatting)
-            message = (
-                "<b>System Information</b> 📊\n"
-                f"💻 <b>OS:</b> {os_info}\n"
-                f"🐍 <b>Python:</b> {python_version}\n"
-                f"🧠 <b>CPU Cores:</b> {cpu_count}\n\n"
-                "<b>Resource Usage</b> ⚙️\n"
-                f"📈 <b>CPU:</b> {cpu_percent}% (over 3s)\n"
-                f"🧮 <b>RAM:</b> {ram_used:.2f}GB / {ram_total:.2f}GB ({memory.percent}%)\n"
-                f"💾 <b>Disk:</b> {disk_used:.2f}GB / {disk_total:.2f}GB ({disk.percent}%)"
-            )
+        app_version = config.app_version
 
-            await update.message.reply_text(message, parse_mode="HTML")
-        except Exception as e:
-            await update.message.reply_text(f"Error retrieving system info: {str(e)}")
-            logger.error(f"Info command error: {str(e)}")
+        # Uptime
+        uptime_str = get_uptime()
+
+        # Formatted message with icons (using HTML for better formatting)
+        message = (
+            "<b>System Information</b> 📊\n"
+            f"📌 <b>App Version:</b> {app_version}\n"
+            f"💻 <b>OS:</b> {os_info}\n"
+            f"🐍 <b>Python:</b> {python_version}\n"
+            f"🧠 <b>CPU Cores:</b> {cpu_count}\n\n"
+            f"⏰ <b>Uptime:</b> {uptime_str if uptime_str else 'Not available'}\n" 
+            f"\n"
+            "<b>Resource Usage</b> ⚙️\n"
+            f"📈 <b>CPU:</b> {cpu_percent}% (over 3s)\n"
+            f"🧮 <b>RAM:</b> {ram_used:.2f}GB / {ram_total:.2f}GB ({ram_percent}%)\n"
+            f"💾 <b>Disk:</b> {disk_used:.2f}GB / {disk_total:.2f}GB ({disk_percent}%)"
+        )
+
+        await update.message.reply_text(message, parse_mode="HTML")

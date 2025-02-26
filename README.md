@@ -8,6 +8,7 @@ first-telegram-bot/
 │
 ├── src/                   # Source code directory
 │   ├── __init__.py        # Makes src a package
+│   ├── __version__.py     # Store application version
 │   ├── bot.py             # Main bot application logic
 │   ├── config.py          # Configuration and environment variables
 │   ├── commands.py        # Command handlers

@@ -2,6 +2,7 @@
 import os
 from asyncio import Lock
 from dotenv import load_dotenv
+from src.__version__ import VERSION
 import logging
 from logging.handlers import RotatingFileHandler
 
@@ -54,6 +55,7 @@ class BotConfig:
         self.cities = CITIES
         self.debug_time_loop = DEBUG_TIME_LOOP
         self.scheduled_weather_loop = SCHEDULED_WEATHER_LOOP
+        self.app_version = VERSION
 
 config = BotConfig()
 

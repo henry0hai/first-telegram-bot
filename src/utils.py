@@ -1,7 +1,11 @@
 # src/utils.py
 import pytz
+import time
+import psutil
 import requests
+import platform
 from datetime import datetime
+from src.config import config, bot_lock, logger
 from src.config import WEATHER_API_KEY, WEATHER_BASE_URL, WEATHER_ICONS, logger
 from src.config import (
     ICON_WIND,
@@ -98,3 +102,42 @@ async def get_weather(city, context=None, chat_id=None):
                 chat_id=chat_id, text=f"Error fetching weather for {city}: {str(e)}"
             )
         return None
+
+
+# Helper functions for resource usage
+def get_cpu_usage(interval=1):
+    """Get CPU usage percentage."""
+    return psutil.cpu_percent(interval=interval)
+
+
+def get_ram_usage():
+    """Get RAM usage in GB and percentage."""
+    memory = psutil.virtual_memory()
+    used = memory.used / (1024 * 1024 * 1024)  # Convert to GB
+    total = memory.total / (1024 * 1024 * 1024)  # Convert to GB
+    return used, total, memory.percent
+
+
+def get_disk_usage(path="/"):
+    """Get disk usage in GB and percentage."""
+    disk = psutil.disk_usage(path)
+    used = disk.used / (1024 * 1024 * 1024)  # Convert to GB
+    total = disk.total / (1024 * 1024 * 1024)  # Convert to GB
+    return used, total, disk.percent
+
+
+def get_sys_info():
+    """Get system information."""
+    os_info = platform.system() + " " + platform.release()
+    python_version = platform.python_version()
+    cpu_count = psutil.cpu_count()
+    return os_info, python_version, cpu_count
+
+def get_uptime():
+    """Calculate and return formatted uptime or None if start_time is not set."""
+    if config.start_time is None:
+        return None
+    uptime_seconds = time.time() - config.start_time
+    hours, remainder = divmod(int(uptime_seconds), 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{hours}h {minutes}m {seconds}s"
