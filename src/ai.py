@@ -8,12 +8,16 @@ client = InferenceClient(api_key=config.hf_key_api)
 # Store conversation history (question-answer pairs) per user
 conversation_history = {}  # Format: {user_id: [{"question": str, "answer": str}, ...]}
 
+# Store accuracy/correctness data per user as a list of facts
+accuracy_data = {}  # Format: {user_id: ["fact1", "fact2", ...]}
+
 # Command mapping with emojis
 COMMAND_MAP = {
-    "info": {"func": "info", "emoji": "📊"},  # System info
-    "uptime": {"func": "uptime", "emoji": "⏰"},  # Uptime
-    "weather": {"func": "weather", "emoji": "🌦️"},  # Weather info
-    "cpu": {"func": "cpu", "emoji": "📈"},  # CPU info
+    "info": {"func": "info", "emoji": "📊"},
+    "system info": {"func": "info", "emoji": "📊"},
+    "uptime": {"func": "uptime", "emoji": "⏰"},
+    "weather": {"func": "weather", "emoji": "🌦️"},
+    "cpu": {"func": "cpu", "emoji": "📈"},
 }
 
 
@@ -23,6 +27,7 @@ async def process_with_ai(user_input, update=None, context=None):
     user_id = update.message.from_user.id if update else None
     username = update.message.from_user.username or "Unknown" if update else "Unknown"
 
+    # Handle conversation reset
     if user_input.lower() in [
         "clear",
         "create new conversation",
@@ -34,18 +39,77 @@ async def process_with_ai(user_input, update=None, context=None):
             logger.info(f"Cleared conversation history for user {username} ({user_id})")
         return "🧹 Conversation cleared! Let's start fresh."
 
+    # Initialize user data if not present
     if user_id and user_id not in conversation_history:
         conversation_history[user_id] = []
+    if user_id and user_id not in accuracy_data:
+        accuracy_data[user_id] = []  # Initialize as a list
 
+    # Handle accuracy data input (e.g., "remember: <some fact>")
+    remember_triggers = [
+        "remember the fact: ",
+        "remember this: ",
+        "remember the following: ",
+        "remember this one: ",
+        "remember:",
+        "remember:\n",  # Explicitly match with newline
+        "please remember this: ",
+    ]
+    input_lower = user_input.strip().lower()
+    logger.info(f"Raw input_lower: '{input_lower}'")  # Debug logging
+
+    # Check for triggers in a multi-line safe way
+    for trigger in remember_triggers:
+        if input_lower.startswith(trigger):  # Use startswith for exact match at start
+            logger.info(f"Matched trigger: '{trigger}'")
+            fact_block = user_input[
+                user_input.lower().index(trigger) + len(trigger) :
+            ].strip()
+            if not fact_block:
+                return "🤔 Please provide a fact to remember (e.g., 'remember: The sky is blue')."
+
+            # Split the fact block into individual lines/facts
+            facts = [line.strip() for line in fact_block.split("\n") if line.strip()]
+            if not facts:
+                return "🤔 Please provide at least one valid fact to remember."
+
+            # Ensure user_id has a list initialized
+            if user_id not in accuracy_data:
+                accuracy_data[user_id] = []
+
+            # Append each fact individually
+            for fact in facts:
+                accuracy_data[user_id].append(fact)
+                logger.info(f"Stored fact for {username} ({user_id}): '{fact}'")
+
+            # Format the response with all facts
+            response = "✅ Remembered the following mappings:\n" + "\n".join(
+                f"* {fact}" for fact in facts
+            )
+            return response
+
+    # Build context for conversation history
     context_prompt = ""
     if user_id and conversation_history[user_id]:
         context_prompt = "Previous conversation:\n"
         for entry in conversation_history[user_id]:
             context_prompt += f"User: {entry['question']}\nBot: {entry['answer']}\n"
 
+    # Build context for accuracy data (list of facts)
+    accuracy_prompt = ""
+    if user_id and accuracy_data.get(user_id):
+        accuracy_prompt = "User-provided facts to remember:\n"
+        for i, fact in enumerate(accuracy_data[user_id], 1):
+            accuracy_prompt += f"{i}. {fact}\n"
+
     # Direct command matching with parameters
     input_lower = user_input.strip().lower()
     logger.info(f"Checking direct command match for input: '{input_lower}'")
+
+    logger.info(f"context_prompt: '{context_prompt}'")
+
+    logger.info(f"accuracy_prompt: '{accuracy_prompt}'")
+
     for command, details in COMMAND_MAP.items():
         if input_lower == command or input_lower.startswith(command + " "):
             logger.info(f"Matched command: {command}")
@@ -55,13 +119,10 @@ async def process_with_ai(user_input, update=None, context=None):
                 else None
             )
 
-            # Special handling for weather command to clean up "in"
             if command == "weather" and params:
-                # Split params into words and remove "in" if it's the first word
                 param_words = params.split()
                 if param_words and param_words[0] == "in":
                     params = " ".join(param_words[1:]).strip()
-                # If params is now empty, treat it as no params
                 if not params:
                     params = None
 
@@ -84,15 +145,17 @@ async def process_with_ai(user_input, update=None, context=None):
                     conversation_history[user_id] = conversation_history[user_id][-10:]
             return None
 
-    # AI fallback
+    # AI fallback with accuracy data included
     prompt = f"""
     You are a Telegram bot assistant. The user asked: "{user_input}".
     {context_prompt}
+    {accuracy_prompt}
     Interpret their intent strictly:
-    - If they likely want a command from this list—{", ".join(COMMAND_MAP.keys())}—return *only* the command name (e.g., "weather") or the command with its full parameter if provided (e.g., "weather London or weather in London or how the weather in London").
-    - If a command like "weather" is implied and includes a location, return the full phrase (e.g., "weather London").
-    - Otherwise, answer the user's question naturally and concisely, performing calculations or providing information as needed, mandatory prefixed with "CHAT:" (e.g., "CHAT: The result of 5 x 7 - 2 is 33" or "CHAT: I don't have enough info to answer that!").
-    Do not add extra text beyond the command with parameters unless it's a "CHAT:" response.
+    - Use the provided facts to refine your understanding or responses where applicable.
+    - If the user's input contains a specific command (e.g., './bin/cstool ...') as part of an example or instruction, return a response that includes the full command exactly as provided, prefixed with: "In order to export the list of Wave accounts with their respective features enabled for JIG-SAW, use the following command:" followed by the command in a new line (e.g., "./bin/cstool export --env prod --type wave_meta --msp MSP-5bc04603c8303"). Do not truncate or rephrase the command unless explicitly asked.
+    - If they likely want a command from this list—{", ".join(COMMAND_MAP.keys())}—return *only* the command name (e.g., "weather") or the command with its full parameter if provided (e.g., "weather London").
+    - Otherwise, answer the user's question naturally and concisely, performing calculations or providing information as needed, mandatory prefixed with "CHAT:" (e.g., "CHAT: The result of 5 x 7 - 2 is 33").
+    Do not add extra text beyond the specified format unless it's a "CHAT:" response.
     """
 
     messages = [{"role": "user", "content": prompt}]
@@ -100,7 +163,7 @@ async def process_with_ai(user_input, update=None, context=None):
         stream = client.chat.completions.create(
             model="mistralai/Mistral-7B-Instruct-v0.3",
             messages=messages,
-            max_tokens=100,
+            max_tokens=200,  # Increased from 100 to avoid truncation of longer responses
             stream=True,
         )
         response = ""
@@ -137,9 +200,7 @@ async def process_with_ai(user_input, update=None, context=None):
         elif response.startswith("CHAT:"):
             final_response = response.replace("CHAT:", "").strip()
         else:
-            final_response = (
-                "🤔 I don't quite get that. Try a command or ask me something else!"
-            )
+            final_response = response  # Use raw response if it matches expected format
 
         if user_id:
             conversation_history[user_id].append(
