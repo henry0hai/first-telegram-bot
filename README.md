@@ -42,6 +42,8 @@ first-telegram-bot/
 - `/stop`: Stops all scheduled activities (admin only).
 - __Scheduled Tasks__: Automatically sends weather updates and debug messages at configurable intervals.
 
+> With AI model, now can directly command using: `info` or `weather in London`, `uptime` directly without `/`
+
 ## Prerequisites
 
 - __Python__: 3.12 or higher (for local development)
