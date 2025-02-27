@@ -42,7 +42,7 @@ first-telegram-bot/
 - `/stop`: Stops all scheduled activities (admin only).
 - __Scheduled Tasks__: Automatically sends weather updates and debug messages at configurable intervals.
 
-> With AI model, now can directly command using: `info` or `weather in London`, `uptime` directly without `/`
+> With AI model, now can directly command using: `info` or `weather in London`, `uptime` directly without `/` for some command
 
 ## Prerequisites
 
@@ -85,7 +85,9 @@ pip install -r requirements.txt
 python run.py
 ```
 
-### Docker Deployment
+### Docker Deployment 
+
+- I'm currently deploy on Rasberries 4, 4Gb RAM. Seem working well.
 
 1. __Clone the Repository__:
 
@@ -127,6 +129,10 @@ docker compose down
 - In case it stopped, restart by */start* command
 - User */help* to see all available commands
 - Admin-only commands like */stop* require the username to match *ADMIN_USER_NAME*
+
+## Future Plan
+
+- Improve AI response
 
 ## Contributing
 
