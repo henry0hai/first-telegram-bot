@@ -14,7 +14,7 @@ from src.commands import (
     stop,
     help_command,
     say,
-    kiemtra,
+    status,
     cpu,
     ram,
     disk,
@@ -52,7 +52,7 @@ def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("say", say))
-    application.add_handler(CommandHandler("kiemtra", kiemtra))
+    application.add_handler(CommandHandler("status", status))
     application.add_handler(CommandHandler("cpu", cpu))
     application.add_handler(CommandHandler("ram", ram))
     application.add_handler(CommandHandler("disk", disk))

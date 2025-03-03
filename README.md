@@ -32,7 +32,7 @@ first-telegram-bot/
 - `/start`: Starts or restarts bot activities and greets the user.
 - `/help`: Displays a list of available commands.
 - `/say <message>`: Echoes back the user's message.
-- `/kiemtra`: Shows bot status with the current server time.
+- `/status`: Shows bot status with the current server time.
 - `/cpu`: Reports current CPU usage percentage.
 - `/ram`: Reports RAM usage in GB and percentage.
 - `/disk`: Reports disk usage for the root directory in GB and percentage.

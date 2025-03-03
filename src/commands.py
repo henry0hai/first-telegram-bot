@@ -119,7 +119,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         /start - Start the bot
         /help - Show this help message
         /say <message> - Echo your message
-        /kiemtra - Check bot status
+        /status - Check bot status
         /cpu - Get CPU usage
         /ram - Get RAM usage
         /disk - Get disk usage
@@ -140,9 +140,9 @@ async def say(update: Update, context: ContextTypes.DEFAULT_TYPE, params=None):
             await update.message.reply_text("Please provide a message after /say")
 
 
-async def kiemtra(update: Update, context: ContextTypes.DEFAULT_TYPE, params=None):
+async def status(update: Update, context: ContextTypes.DEFAULT_TYPE, params=None):
     async with bot_lock:
-        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S %Z')
         await update.message.reply_text(f"Bot is running! Current time: {current_time}")
 
 
