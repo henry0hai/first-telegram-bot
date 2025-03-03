@@ -9,6 +9,7 @@ services:
       - ADMIN_ID=${ADMIN_ID}
       - ADMIN_USER_NAME=${ADMIN_USER_NAME}
       - WEATHER_API_KEY=${WEATHER_API_KEY}
+      - TZ=Asia/Ho_Chi_Minh
     volumes:
       - ./logs:/app/logs  # Persist logs outside the container
     restart: unless-stopped  # Restart unless explicitly stopped
