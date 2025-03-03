@@ -3,6 +3,7 @@ from telegram.ext import ContextTypes
 from src.config import ADMIN_ID, CITIES, bot_lock
 from src.utils import get_weather
 from datetime import datetime
+from tzlocal import get_localzone
 
 from src.logging_utils import get_logger  
 logger = get_logger(__name__)
@@ -47,7 +48,8 @@ async def scheduled_weather(context: ContextTypes.DEFAULT_TYPE):
 
 async def debug_time(context: ContextTypes.DEFAULT_TYPE):
     async with bot_lock:
-        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S %Z')
+        local_tz = get_localzone()  # Auto-detect system timezone
+        current_time = datetime.now(local_tz).strftime("%Y-%m-%d %H:%M:%S %Z (%z)")
         await context.bot.send_message(
             chat_id=ADMIN_ID, text=f"Debug: Current time is {current_time}"
         )

@@ -1,6 +1,7 @@
 # src/commands.py
 from telegram import Update
 from datetime import datetime
+from tzlocal import get_localzone
 from telegram.ext import ContextTypes
 from src.utils import (
     get_weather,
@@ -142,7 +143,8 @@ async def say(update: Update, context: ContextTypes.DEFAULT_TYPE, params=None):
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE, params=None):
     async with bot_lock:
-        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S %Z')
+        local_tz = get_localzone()  # Auto-detect system timezone
+        current_time = datetime.now(local_tz).strftime("%Y-%m-%d %H:%M:%S %Z (%z)")
         await update.message.reply_text(f"Bot is running! Current time: {current_time}")
 
 
