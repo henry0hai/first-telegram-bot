@@ -47,7 +47,7 @@ async def scheduled_weather(context: ContextTypes.DEFAULT_TYPE):
 
 async def debug_time(context: ContextTypes.DEFAULT_TYPE):
     async with bot_lock:
-        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S %Z')
         await context.bot.send_message(
             chat_id=ADMIN_ID, text=f"Debug: Current time is {current_time}"
         )
