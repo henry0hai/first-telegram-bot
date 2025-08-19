@@ -1,12 +1,19 @@
 # src/ai.py
-from huggingface_hub import InferenceClient
+# from huggingface_hub import InferenceClient
+from openai import OpenAI
 from src.config import config
 
-from src.logging_utils import get_logger  
+from src.logging_utils import get_logger
+
 logger = get_logger(__name__)
 
-# Initialize the Hugging Face Inference Client
-client = InferenceClient(api_key=config.hf_key_api)
+# # Initialize the Hugging Face Inference Client
+# client = InferenceClient(api_key=config.hf_key_api)
+
+client = OpenAI(
+    base_url="http://localhost:11434/v1",  # Point to your local Ollama server
+    api_key="ollama",  # This is a placeholder key
+)
 
 # Store conversation history (question-answer pairs) per user
 conversation_history = {}  # Format: {user_id: [{"question": str, "answer": str}, ...]}
@@ -40,10 +47,12 @@ async def process_with_ai(user_input, update=None, context=None):
         if user_id in conversation_history:
             del conversation_history[user_id]
             logger.info(f"Cleared conversation history for user {username} ({user_id})")
-    
+
         if user_id in accuracy_data:
             del accuracy_data[user_id]
-            logger.info(f"Cleared all accuracy_data history for user {username} ({user_id})")
+            logger.info(
+                f"Cleared all accuracy_data history for user {username} ({user_id})"
+            )
         return "🧹 All data cleared! Let's start fresh."
 
     # Initialize user data if not present
@@ -154,49 +163,118 @@ async def process_with_ai(user_input, update=None, context=None):
 
     # AI fallback with accuracy data included
     prompt = f"""
-    You are a Telegram bot assistant. The user asked: "{user_input}".
-    {context_prompt}
-    {accuracy_prompt}
-    Interpret their intent strictly:
-    - Use the provided facts to refine your understanding or responses where applicable.
-    - If the user's input contains a specific command (e.g., './bin/cstool ...') as part of an example or instruction, return a response that includes the full command exactly as provided, prefixed with: "In order to export the list of Wave accounts with their respective features enabled for JIG-SAW, use the following command:" followed by the command in a new line (e.g., "./bin/cstool export --env prod --type wave_meta --msp MSP-5bc04603c8303"). Do not truncate or rephrase the command unless explicitly asked.
-    - If they likely want a command from this list—{", ".join(COMMAND_MAP.keys())}—return *only* the command name (e.g., "weather") or the command with its full parameter if provided (e.g., "weather London").
-    - Otherwise, answer the user's question naturally and concisely, performing calculations or providing information as needed, mandatory prefixed with "CHAT:" (e.g., "CHAT: The result of 5 x 7 - 2 is 33").
-    Do not add extra text beyond the specified format unless it's a "CHAT:" response.
+    You are a command detection engine for a Telegram bot. Your task is to analyze user requests and determine if their **intent** matches one of the provided commands.
+
+    **Available Commands and Aliases:**
+    {{
+        "info": ["info", "system info", "stats", "system stats"],
+        "uptime": ["uptime", "how long have you been on"],
+        "weather": ["weather"],
+        "cpu": ["cpu", "cpu usage", "what's the cpu at"],
+    }}
+
+    **Instructions:**
+    1.  **Strictly evaluate the user's intent.** If the user is asking a question that is clearly a request for a command, such as a question about the weather, you must return a command.
+    2.  **Extract Parameters:** If a command requires a parameter (like `weather`), you must extract it from the user's request.
+    3.  **Adhere to the Output Format:**
+        * If a command is detected, **output only the command name and any parameters**. Do not add any extra text or conversational phrases.
+        * If **no command is detected**, respond to the user's query naturally. Your response **must begin with the prefix "CHAT:"**.
+    4.  **Use these examples to guide your response:**
+
+    **Examples:**
+    User: How's the weather in London?
+    Output: weather London
+
+    User: What's the CPU usage like?
+    Output: cpu
+
+    User: Can you tell me some facts about the capital of Vietnam?
+    Output: CHAT: The capital of Vietnam is Hanoi. It is famous for its centuries-old architecture and a rich history.
+
+    User: Tell me about your system stats.
+    Output: info
+
+    User: Hi, are you a bot?
+    Output: CHAT: I am a helpful Telegram bot. How can I assist you today?
+
+    **User Query:**
+    "{user_input}"
+
+    **Response:
     """
 
     messages = [{"role": "user", "content": prompt}]
     try:
         stream = client.chat.completions.create(
-            model="mistralai/Mistral-7B-Instruct-v0.3",
+            model="phi3:mini",
             messages=messages,
             max_tokens=200,  # Increased from 100 to avoid truncation of longer responses
             stream=True,
         )
-        response = ""
-        for chunk in stream:
-            if chunk.choices[0].delta.content:
-                response += chunk.choices[0].delta.content
+        # response = ""
+        # for chunk in stream:
+        #     if chunk.choices[0].delta.content:
+        #         response += chunk.choices[0].delta.content
+
+        response = "".join(
+            [
+                chunk.choices[0].delta.content
+                for chunk in stream
+                if chunk.choices[0].delta.content
+            ]
+        )
 
         logger.info(f"User input from {username} ({user_id}): {user_input}")
         logger.info(f"Raw AI response from {username} ({user_id}): {response}")
 
-        response = response.strip()
-        if response in COMMAND_MAP or any(
-            response.startswith(cmd + " ") for cmd in COMMAND_MAP
-        ):
-            command = response.split(" ")[0]
+        # --- NEW CODE LOGIC ---
+        # 1. Clean the response: remove code block markers, newlines, and excess whitespace
+        cleaned_response = (
+            response.replace("```plaintext", "").replace("```", "").strip()
+        )
+
+        # 2. Check for command vs. chat
+        is_command = False
+        final_response = ""
+
+        # Check for commands in the cleaned response
+        for command in COMMAND_MAP.keys():
+            # Check for exact command or command with a space
+            if (
+                cleaned_response.lower() == command
+                or cleaned_response.lower().startswith(command + " ")
+            ):
+                is_command = True
+                final_response = cleaned_response
+                break
+
+        # Check if it's a chat response (if not a command)
+        if not is_command and cleaned_response.startswith("CHAT:"):
+            final_response = cleaned_response.replace("CHAT:", "").strip()
+
+        # If it's a command, execute it
+        if is_command:
+            command = final_response.split(" ")[0].lower()
             params = (
-                response[len(command) :].strip()
-                if len(response) > len(command)
+                final_response[len(command) :].strip()
+                if len(final_response) > len(command)
                 else None
             )
+
+            # Additional logic for weather command with params
+            if command == "weather" and params:
+                param_words = params.split()
+                if param_words and param_words[0].lower() == "in":
+                    params = " ".join(param_words[1:]).strip()
+
+            # Proceed to execute the command function
             final_response = (
                 f"{COMMAND_MAP[command]['emoji']} Executing {command} command..."
             )
             await update.message.reply_text(final_response)
             func = locals()[COMMAND_MAP[command]["func"]]
             await func(update, context, params=params)
+
             if user_id:
                 conversation_history[user_id].append(
                     {"question": user_input, "answer": final_response}
@@ -204,18 +282,16 @@ async def process_with_ai(user_input, update=None, context=None):
                 if len(conversation_history[user_id]) > 10:
                     conversation_history[user_id] = conversation_history[user_id][-10:]
             return None
-        elif response.startswith("CHAT:"):
-            final_response = response.replace("CHAT:", "").strip()
         else:
-            final_response = response  # Use raw response if it matches expected format
+            # It's a chat response, send it directly
+            if user_id:
+                conversation_history[user_id].append(
+                    {"question": user_input, "answer": final_response}
+                )
+                if len(conversation_history[user_id]) > 10:
+                    conversation_history[user_id] = conversation_history[user_id][-10:]
+            return final_response
 
-        if user_id:
-            conversation_history[user_id].append(
-                {"question": user_input, "answer": final_response}
-            )
-            if len(conversation_history[user_id]) > 10:
-                conversation_history[user_id] = conversation_history[user_id][-10:]
-        return final_response
     except Exception as e:
         logger.error(f"AI processing error for {username} ({user_id}): {str(e)}")
         return f"😵 Sorry, something went wrong: {str(e)}. Try again!"

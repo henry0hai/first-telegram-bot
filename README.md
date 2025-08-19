@@ -50,6 +50,7 @@ first-telegram-bot/
 - __Docker__: Docker Engine 24.x or later with `docker compose` (for containerized deployment)
 - __Telegram__: A bot token from [BotFather](https://t.me/BotFather)
 - __OpenWeatherMap__: An API key for weather features (optional)
+- __Ollama__: Local Ollama install and model
 
 ## Installation
 
