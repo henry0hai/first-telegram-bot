@@ -1,6 +1,6 @@
 # Telegram System Monitor Bot
 
-A Telegram bot built with Python that provides system monitoring (CPU, RAM, disk usage), weather updates, and administrative controls. It uses the `python-telegram-bot` library, threading with locks for safe multi-user interactions, and scheduled tasks for periodic updates. 
+An advanced, modular Telegram bot built with Python for system monitoring (CPU, RAM, disk usage), weather updates, and administrative controls. Now featuring AI-powered natural language understanding, intent detection, and integration with Model Context Protocol (MCP) for intelligent responses and workflow automation. The bot uses the `python-telegram-bot` library, robust locking for safe multi-user interactions, scheduled tasks, and supports both classic and MCP-enhanced operation modes. Easily extensible with a scalable architecture, N8N webhook integration, and future-ready for additional AI, database, and microservice features.
 
 **Noted**: Just added the feature using simple AI model make it more useful.
 
