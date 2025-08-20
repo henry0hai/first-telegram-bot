@@ -173,18 +173,6 @@ or
 python run.py
 ```
 
-## 📈 Future Enhancements
-
-This structure is designed to easily accommodate:
-- Multiple AI providers
-- Database integrations
-- Authentication systems
-- Rate limiting
-- Monitoring and analytics
-- Multi-language support
-- Plugin architecture
-- Microservices deployment
-
 ### Docker Deployment 
 
 - I'm currently deploy on Rasberries 4, 4Gb RAM. Seem working well.
@@ -229,10 +217,20 @@ docker compose down
 - In case it stopped, restart by */start* command
 - User */help* to see all available commands
 - Admin-only commands like */stop* require the username to match *ADMIN_USER_NAME*
+- MCP-enhanced bot can process commands like `info`, `weather in London`, `uptime` directly without `/`
+- MCP-enhanced bot can also handle more complex queries and provide richer responses and connect via webhook n8n to connect with MCP AI AGENT for more complex task
+- MCP-enhanced bot can integrate with external APIs and services for additional functionality
 
-## Future Plan
+## 📈 Future Enhancements
 
-- Improve AI response
+- Multiple AI providers
+- Database integrations
+- Authentication systems
+- Rate limiting
+- Monitoring and analytics
+- Multi-language support
+- Plugin architecture
+- Microservices deployment
 
 ## Contributing
 
