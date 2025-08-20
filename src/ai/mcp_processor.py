@@ -1,9 +1,9 @@
-# src/mcp_ai.py
+# src/ai/mcp_ai.py
 import re
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
-from src.logging_utils import get_logger
-from src.mcp_instructions import get_mcp_instructions, get_intent_guidance
+from src.utils.logging_utils import get_logger
+from src.ai.mcp_instructions import get_mcp_instructions, get_intent_guidance
 
 logger = get_logger(__name__)
 
@@ -71,6 +71,8 @@ class MCPAIProcessor:
             "performance",
             "resources",
             "capacity",
+            "status",
+            "system status"
         ]
 
         self.weather_keywords = [

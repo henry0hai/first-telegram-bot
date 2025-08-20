@@ -1,10 +1,10 @@
-# src/bot.py
+# src/core/bot.py - Main bot application
 import time
 import fcntl
 
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
-from src.config import config
-from src.commands import (
+from config.config import config
+from src.handlers.commands import (
     start,
     stop,
     help_command,
@@ -16,14 +16,11 @@ from src.commands import (
     weather,
     uptime,
     info,
-    handle_text,
-    handle_photo,
-    handle_document,
 )
-from src.scheduler import on_startup, scheduled_weather, debug_time
-from src.lock import ensure_single_instance
-
-from src.logging_utils import get_logger
+from src.handlers.messages import handle_text, handle_photo, handle_document
+from src.services.scheduler import on_startup, scheduled_weather, debug_time
+from src.utils.lock import ensure_single_instance
+from src.utils.logging_utils import get_logger
 
 logger = get_logger(__name__)
 
@@ -60,15 +57,11 @@ def main():
     application.add_handler(CommandHandler("info", info))
     application.add_error_handler(error_handler)
 
-    # New text handler for non-command messages
+    # Message handlers
     application.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text)
     )
-
-    # Photo handler
     application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
-
-    # Document handler
     application.add_handler(MessageHandler(filters.Document.ALL, handle_document))
 
     # Initial scheduling

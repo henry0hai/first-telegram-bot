@@ -6,26 +6,88 @@ A Telegram bot built with Python that provides system monitoring (CPU, RAM, disk
 
 ## Project Structure
 
+```bash
 first-telegram-bot/
-│
-├── src/                   # Source code directory
-│   ├── __init__.py        # Makes src a package
-│   ├── __version__.py     # Store application version
-│   ├── ai.py              # Call AI API to help user interaction
-│   ├── bot.py             # Main bot application logic
-│   ├── config.py          # Configuration and environment variables
-│   ├── commands.py        # Command handlers
-│   ├── scheduler.py       # Scheduled tasks (weather updates, debug time)
-│   ├── utils.py           # Utility functions (weather fetching, direction conversion)
-│   ├── logging_utils.py   # Handle logging
-│   └── lock.py            # Single-instance lock logic
-│
-├── sample.env             # Sample Environment variables file
-├── requirements.txt       # List of dependencies
-├── run.py                 # Entry point to start the bot
-└── README.md              # Project Documentation
-├── Dockerfile             # Dockerfile to build the container image
-└── docker-compose.yaml    # Docker Compose configuration for running the bot
+├── config/                          # Configuration files
+│   ├── __init__.py
+│   └── config.py                    # Main configuration settings
+├── src/
+│   ├── __init__.py
+│   ├── __version__.py               # Version information
+│   ├── core/                        # Core application logic
+│   │   ├── __init__.py
+│   │   ├── bot.py                   # Main bot application
+│   │   └── mcp_bot.py               # MCP-enhanced bot application
+│   ├── handlers/                    # Message and command handlers
+│   │   ├── __init__.py
+│   │   ├── commands.py              # Command handlers (/start, /help, etc.)
+│   │   ├── messages.py              # Regular message handlers
+│   │   └── mcp_messages.py          # MCP-enhanced message handlers
+│   ├── services/                    # External service integrations
+│   │   ├── __init__.py
+│   │   ├── scheduler.py             # Task scheduling service
+│   │   ├── webhook_service.py       # N8N webhook integration
+│   │   └── weather_service.py       # Weather API service
+│   ├── ai/                          # AI processing and intelligence
+│   │   ├── __init__.py
+│   │   ├── ai_processor.py          # Basic AI processing
+│   │   ├── mcp_processor.py         # MCP AI processing logic
+│   │   └── mcp_instructions.py      # MCP AI instructions and prompts
+│   ├── database/                    # Database operations and vector stores
+│   │   ├── __init__.py
+│   │   ├── qdrant_client.py         # Qdrant vector database client
+│   │   └── models.py                # Database models (future)
+│   ├── utils/                       # Utility functions and helpers
+│   │   ├── __init__.py
+│   │   ├── logging_utils.py         # Logging utilities
+│   │   ├── lock.py                  # File locking utilities
+│   │   └── system_utils.py          # System information utilities
+│   └── middleware/                  # Request/response processing
+│       ├── __init__.py
+│       ├── auth_middleware.py       # Authentication middleware (future)
+│       └── rate_limiter.py          # Rate limiting middleware (future)
+├── logs/                            # Log files
+├── requirements.txt
+├── docker-compose.yaml
+├── Dockerfile
+└── README.md
+```
+## 📋 Module Responsibilities
+
+### 🔧 Core (`src/core/`)
+- **bot.py**: Main bot application entry point
+- **mcp_bot.py**: MCP-enhanced bot with intelligent processing
+
+### 🎮 Handlers (`src/handlers/`)
+- **commands.py**: Telegram command handlers (/start, /help, /weather, etc.)
+- **messages.py**: Regular message handlers (text, photo, document)
+- **mcp_messages.py**: MCP-enhanced message handlers with AI processing
+
+### 🌐 Services (`src/services/`)
+- **scheduler.py**: Background task scheduling
+- **webhook_service.py**: N8N webhook integration
+- **weather_service.py**: Weather API integration
+
+### 🤖 AI (`src/ai/`)
+- **ai_processor.py**: Basic AI processing logic
+- **mcp_processor.py**: MCP AI preprocessing and intent detection
+- **mcp_instructions.py**: Centralized AI instructions and prompts
+
+### 🗄️ Database (`src/database/`)
+- **qdrant_client.py**: Qdrant vector database operations
+- **models.py**: Database models and schemas (future)
+
+### 🛠️ Utils (`src/utils/`)
+- **logging_utils.py**: Logging configuration and utilities
+- **lock.py**: File locking for single instance
+- **system_utils.py**: System information and resource monitoring
+
+### 🚦 Middleware (`src/middleware/`)
+- **auth_middleware.py**: User authentication and authorization (future)
+- **rate_limiter.py**: Request rate limiting (future)
+
+### ⚙️ Config (`config/`)
+- **config.py**: Application configuration and environment variables
 
 ## Features
 
@@ -85,6 +147,43 @@ pip install -r requirements.txt
 ```bash
 python run.py
 ```
+
+## 🔄 Running the Application
+
+### Regular Bot:
+
+```bash
+python -m src.core.bot
+```
+
+or
+
+```bash
+python run.py
+```
+
+### MCP-Enhanced Bot:
+```bash
+python -m src.core.mcp_bot
+```
+
+or
+
+```bash
+python run.py
+```
+
+## 📈 Future Enhancements
+
+This structure is designed to easily accommodate:
+- Multiple AI providers
+- Database integrations
+- Authentication systems
+- Rate limiting
+- Monitoring and analytics
+- Multi-language support
+- Plugin architecture
+- Microservices deployment
 
 ### Docker Deployment 
 

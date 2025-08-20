@@ -1,11 +1,11 @@
-# src/utils.py
+# src/utils/system_utils.py
 import pytz
 import time
 import psutil
 import requests
 import platform
 from datetime import datetime
-from src.config import (
+from config.config import (
     config,
     WEATHER_API_KEY,
     WEATHER_BASE_URL,
@@ -18,7 +18,7 @@ from src.config import (
     ICON_TIME,
 )
 
-from src.logging_utils import get_logger
+from src.utils.logging_utils import get_logger
 
 logger = get_logger(__name__)
 

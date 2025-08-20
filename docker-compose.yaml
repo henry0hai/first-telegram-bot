@@ -9,7 +9,10 @@ services:
       - ADMIN_ID=${ADMIN_ID}
       - ADMIN_USER_NAME=${ADMIN_USER_NAME}
       - WEATHER_API_KEY=${WEATHER_API_KEY}
+      - HF_API_KEY=${HF_API_KEY} # no need from version 1.3.0
       - TZ=Asia/Ho_Chi_Minh
+      - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL}
+      - QDRANT_API_URL=${QDRANT_API_URL}  
     volumes:
       - ./logs:/app/logs  # Persist logs outside the container
     restart: unless-stopped  # Restart unless explicitly stopped

@@ -1,11 +1,11 @@
-# src/scheduler.py
+# src/services/scheduler.py
 from telegram.ext import ContextTypes
-from src.config import ADMIN_ID, CITIES, bot_lock
-from src.utils import get_weather
+from config.config import ADMIN_ID, CITIES, bot_lock
+from src.utils.system_utils import get_weather
 from datetime import datetime
 from tzlocal import get_localzone
 
-from src.logging_utils import get_logger  
+from src.utils.logging_utils import get_logger  
 logger = get_logger(__name__)
 
 

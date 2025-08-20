@@ -1,9 +1,9 @@
-# src/config.py
+# config/config.py
 import os
 from asyncio import Lock
 from dotenv import load_dotenv
 from src.__version__ import VERSION
-from src.logging_utils import get_logger
+from src.utils.logging_utils import get_logger
 
 # Load .env file
 load_dotenv()

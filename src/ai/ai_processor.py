@@ -1,9 +1,8 @@
-# src/ai.py
+# src/ai/ai_processor.py
 # from huggingface_hub import InferenceClient
 from openai import OpenAI
-from src.config import config
 
-from src.logging_utils import get_logger
+from src.utils.logging_utils import get_logger
 
 logger = get_logger(__name__)
 
@@ -32,7 +31,7 @@ COMMAND_MAP = {
 
 
 async def process_with_ai(user_input, update=None, context=None):
-    from src.commands import info, uptime, weather, cpu
+    from src.handlers.commands import info, uptime, weather, cpu
 
     user_id = update.message.from_user.id if update else None
     username = update.message.from_user.username or "Unknown" if update else "Unknown"

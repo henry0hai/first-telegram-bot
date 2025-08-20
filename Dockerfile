@@ -20,11 +20,5 @@ RUN apt-get purge -y --auto-remove gcc python3-dev
 # Copy the entire project directory to the container
 COPY . .
 
-# Set environment variables (optional defaults, can be overridden in docker-compose or .env)
-ENV TELEGRAM_BOT_TOKEN=YOUR_TELEGRAM_BOT_TOKEN_HERE
-ENV ADMIN_ID=YOUR_TELEGRAM_USER_ID
-ENV ADMIN_USER_NAME=YOUR_TELEGRAM_USER_NAME
-ENV WEATHER_API_KEY=YOUR_OPENWEATHERMAP_API_KEY
-
 # Run the bot using run.py
 CMD ["python", "run.py"]

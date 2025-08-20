@@ -1,7 +1,8 @@
+# src/database/qdrant_client.py
 # Qdrant utility for clearing all collections
 
 import httpx
-from src.config import config
+from config.config import config
 
 
 async def clear_all_qdrant_collections():
