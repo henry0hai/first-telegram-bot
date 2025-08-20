@@ -2,12 +2,7 @@
 import time
 import fcntl
 
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    MessageHandler,
-    filters
-)
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
 from src.config import config
 from src.commands import (
     start,
@@ -21,12 +16,15 @@ from src.commands import (
     weather,
     uptime,
     info,
-    handle_text
+    handle_text,
+    handle_photo,
+    handle_document,
 )
 from src.scheduler import on_startup, scheduled_weather, debug_time
 from src.lock import ensure_single_instance
 
-from src.logging_utils import get_logger  
+from src.logging_utils import get_logger
+
 logger = get_logger(__name__)
 
 
@@ -66,6 +64,12 @@ def main():
     application.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text)
     )
+
+    # Photo handler
+    application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+
+    # Document handler
+    application.add_handler(MessageHandler(filters.Document.ALL, handle_document))
 
     # Initial scheduling
     job_queue.run_once(on_startup, 0)

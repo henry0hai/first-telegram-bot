@@ -16,6 +16,9 @@ WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 WEATHER_BASE_URL = "http://api.openweathermap.org/data/2.5/weather"
 CITIES = os.getenv("CITIES", "").split(",")
 HF_API_KEY = os.getenv("HF_API_KEY")
+N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL")
+QDRANT_API_URL = os.getenv("QDRANT_API_URL", "http://localhost:6333")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 
 # Validate environment variables
 if not all([TELEGRAM_BOT_TOKEN, ADMIN_ID, WEATHER_API_KEY, CITIES]):
@@ -42,6 +45,7 @@ START_TIME = None
 DEBUG_TIME_LOOP = 1800  # 30 minutes
 SCHEDULED_WEATHER_LOOP = 7200  # 2 hours
 
+
 class BotConfig:
     def __init__(self):
         self.is_bot_running = False
@@ -57,6 +61,10 @@ class BotConfig:
         self.debug_time_loop = DEBUG_TIME_LOOP
         self.scheduled_weather_loop = SCHEDULED_WEATHER_LOOP
         self.app_version = VERSION
+        self.n8n_webhook_url = N8N_WEBHOOK_URL
+        self.qdrant_api_url = QDRANT_API_URL
+        self.qdrant_api_key = QDRANT_API_KEY
+
 
 config = BotConfig()
 
