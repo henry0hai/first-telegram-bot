@@ -17,6 +17,11 @@ from src.handlers.commands import (
     uptime,
     info,
 )
+from src.handlers.scheduler_commands import (
+    tasks_command,
+    cancel_command,
+    schedule_command,
+)
 from src.handlers.messages import handle_photo, handle_document
 from src.handlers.mcp_messages import handle_mcp_text
 from src.services.scheduler import on_startup, scheduled_weather, debug_time
@@ -58,6 +63,12 @@ def main():
     application.add_handler(CommandHandler("weather", weather))
     application.add_handler(CommandHandler("uptime", uptime))
     application.add_handler(CommandHandler("info", info))
+
+    # Scheduler command handlers
+    application.add_handler(CommandHandler("tasks", tasks_command))
+    application.add_handler(CommandHandler("cancel", cancel_command))
+    application.add_handler(CommandHandler("schedule", schedule_command))
+
     application.add_error_handler(error_handler)
 
     # MCP-enhanced message handlers

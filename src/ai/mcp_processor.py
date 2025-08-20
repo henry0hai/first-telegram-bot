@@ -18,6 +18,7 @@ class IntentType(Enum):
     BUDGET_FINANCE = "budget_finance"
     EMAIL_COMMUNICATION = "email_communication"
     TRANSLATION_LANGUAGE = "translation_language"
+    TASK_SCHEDULER = "task_scheduler"
     UNKNOWN = "unknown"
 
 
@@ -72,7 +73,7 @@ class MCPAIProcessor:
             "resources",
             "capacity",
             "status",
-            "system status"
+            "system status",
         ]
 
         self.weather_keywords = [
@@ -155,6 +156,44 @@ class MCPAIProcessor:
             "multilingual",
         ]
 
+        # New keyword category for task scheduler
+        self.scheduler_keywords = [
+            "alarm",
+            "remind",
+            "reminder",
+            "schedule",
+            "notify",
+            "notification",
+            "alert",
+            "timer",
+            "after",
+            "every",
+            "recurring",
+            "repeat",
+            "set",
+            "create",
+            "cancel task",
+            "list tasks",
+            "my tasks",
+            "wake me",
+            "stand up",
+            "take water",
+            "break",
+            "meeting",
+            "appointment",
+            "deadline",
+            "in 20 seconds",
+            "in 30 minutes",
+            "every 25 mins",
+            "after 30 seconds",
+            "next week at",
+            "tomorrow at",
+            "at 9:00",
+            "weekly",
+            "daily",
+            "hourly",
+        ]
+
         # Location patterns for weather queries
         self.location_patterns = [
             r"weather in (\w+(?:\s+\w+)*)",
@@ -178,6 +217,26 @@ class MCPAIProcessor:
                     return location.title()
 
         return None
+
+    def _detect_scheduler_type(self, text_lower: str) -> str:
+        """Detect the type of scheduler request"""
+        if any(word in text_lower for word in ["alarm", "after", "in", "wake me"]):
+            return "alarm"
+        elif any(
+            word in text_lower for word in ["every", "remind", "recurring", "repeat"]
+        ):
+            return "reminder"
+        elif any(
+            word in text_lower
+            for word in ["at", "on", "next week", "tomorrow", "schedule"]
+        ):
+            return "notification"
+        elif any(word in text_lower for word in ["cancel", "remove", "delete", "stop"]):
+            return "cancel"
+        elif any(word in text_lower for word in ["list", "show", "my tasks", "tasks"]):
+            return "list"
+        else:
+            return "unknown"
 
     def detect_intent(self, text: str) -> Tuple[IntentType, Dict]:
         """
@@ -208,8 +267,12 @@ class MCPAIProcessor:
             1 for keyword in self.translation_keywords if keyword in text_lower
         )
 
+        scheduler_score = sum(
+            1 for keyword in self.scheduler_keywords if keyword in text_lower
+        )
+
         logger.info(
-            f"Intent scores - RAG: {rag_score}, Search: {search_score}, System: {system_score}, Weather: {weather_score}, Budget: {budget_score}, Email: {email_score}, Translation: {translation_score}"
+            f"Intent scores - RAG: {rag_score}, Search: {search_score}, System: {system_score}, Weather: {weather_score}, Budget: {budget_score}, Email: {email_score}, Translation: {translation_score}, Scheduler: {scheduler_score}"
         )
 
         # Determine intent based on highest score
@@ -221,6 +284,7 @@ class MCPAIProcessor:
             IntentType.BUDGET_FINANCE: budget_score,
             IntentType.EMAIL_COMMUNICATION: email_score,
             IntentType.TRANSLATION_LANGUAGE: translation_score,
+            IntentType.TASK_SCHEDULER: scheduler_score,
         }
 
         max_score = max(scores.values())
@@ -277,6 +341,14 @@ class MCPAIProcessor:
                 "extracted_keywords": [
                     kw for kw in self.translation_keywords if kw in text_lower
                 ],
+            }
+        elif intent == IntentType.TASK_SCHEDULER:
+            context = {
+                "query": text,
+                "extracted_keywords": [
+                    kw for kw in self.scheduler_keywords if kw in text_lower
+                ],
+                "scheduler_type": self._detect_scheduler_type(text_lower),
             }
         else:  # RAG_QUERY
             context = {

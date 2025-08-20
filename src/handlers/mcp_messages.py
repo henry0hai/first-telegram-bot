@@ -5,6 +5,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from config.config import config
 from src.ai.mcp_processor import process_for_mcp_ai, IntentType
+from src.handlers.scheduler_handler import handle_scheduler_command
 from src.utils.logging_utils import get_logger
 
 logger = get_logger(__name__)
@@ -23,6 +24,11 @@ async def handle_mcp_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(
         f"MCP processed query - Intent: {mcp_result['intent'].value}, User: {username}"
     )
+
+    # Handle scheduler requests directly (no webhook needed for local scheduling)
+    if mcp_result["intent"] == IntentType.TASK_SCHEDULER:
+        await handle_scheduler_command(update, context, mcp_result["context"])
+        return  # Exit early for scheduler commands
 
     # Send enhanced payload to N8N webhook if configured
     webhook_url = config.n8n_webhook_url
@@ -58,6 +64,7 @@ async def handle_mcp_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         IntentType.BUDGET_FINANCE: "💰 Processing your budget/finance request...",
         IntentType.EMAIL_COMMUNICATION: "📧 Handling your email request...",
         IntentType.TRANSLATION_LANGUAGE: "🌍 Processing translation request...",
+        IntentType.TASK_SCHEDULER: "⏰ Creating your scheduled task...",
         IntentType.UNKNOWN: "🤖 Processing your request...",
     }
 

@@ -48,6 +48,16 @@ You answer questions using information provided by multiple MCP servers. Always 
   - `translate_text` - Translate text between languages
   - `detect_language` - Detect the language of given text
   - `get_supported_languages` - List all supported languages
+
+** Task Scheduler MCP Server **
+* This server provides advanced task scheduling and reminder services:
+  - `create_alarm` - Set one-time alarms (e.g., "after 20 seconds", "in 30 minutes")
+  - `create_reminder` - Set recurring reminders (e.g., "every 25 minutes", "every hour")
+  - `create_notification` - Schedule notifications at specific times (e.g., "next week at 9:00 AM")
+  - `list_tasks` - Show all active scheduled tasks
+  - `cancel_task` - Cancel specific scheduled tasks
+  - `webhook_schedule` - Schedule webhook calls for complex automation (future)
+* Use this server for time-based task scheduling, reminders, alarms, and notification management.
   - `translate_document` - Translate entire documents
 * Use this server for translation requests, language detection, and multilingual communication needs.
 
@@ -113,6 +123,10 @@ This appears to be an email or communication-related request. Use the Email Assi
     "translation_language": """
 ** GUIDANCE FOR THIS QUERY **
 This appears to be a translation or language-related request. Use the Translation Tools MCP Server for language processing tasks.
+""",
+    "task_scheduler": """
+** GUIDANCE FOR THIS QUERY **
+This appears to be a scheduling, reminder, or time-based task request. Use the Task Scheduler MCP Server for creating alarms, reminders, or notifications.
 """,
     "unknown": """
 ** GUIDANCE FOR THIS QUERY **

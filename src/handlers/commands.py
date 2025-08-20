@@ -106,6 +106,17 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         /weather <city> - Get current weather
         /uptime - Show bot uptime
         /info - Show system information
+        
+        🕒 **Scheduler Commands:**
+        /schedule - Show scheduler usage help
+        /tasks - List your scheduled tasks
+        /cancel <task_id> - Cancel a specific task
+        
+        💡 **Natural Language Scheduling:**
+        You can also create tasks by typing naturally:
+        • "Set alarm after 20 seconds"
+        • "Remind me every 25 minutes to stand up"
+        • "Notify me next week at 9:00 AM"
         """
         await update.message.reply_text(help_text)
 
