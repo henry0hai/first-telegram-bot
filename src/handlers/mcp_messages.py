@@ -41,7 +41,7 @@ async def handle_mcp_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Handle dynamic tool requests with preprocessing (user already got feedback)
     if mcp_result["intent"] == IntentType.DYNAMIC_TOOL:
         success, preprocessed_data = await _handle_dynamic_tool_request_enhanced(
-            update, context, mcp_result["context"], user_input, user_id
+            update, context, mcp_result, user_input, user_id
         )
 
         # Use preprocessed data for webhook if preprocessing was successful
@@ -124,7 +124,7 @@ async def handle_mcp_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def _handle_dynamic_tool_request_enhanced(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
-    tool_context: dict,
+    mcp_result: dict,
     user_input: str,
     user_id: int,
 ) -> Tuple[bool, dict]:
@@ -135,6 +135,7 @@ async def _handle_dynamic_tool_request_enhanced(
     to webhook, allowing the MCP server to easily select the correct tools.
     No Telegram message is sent - preprocessing is silent.
     """
+    tool_context = mcp_result["context"]
     query = tool_context.get("query", "")
     tool_type = tool_context.get("tool_type", "auto")
     chat_id = str(update.effective_chat.id)
@@ -142,9 +143,8 @@ async def _handle_dynamic_tool_request_enhanced(
     logger.info(f"Preprocessing DYNAMIC_TOOL request (silent): {tool_type}")
 
     # Preprocess the request for better MCP server handling - FIXED TUPLE HANDLING
-    ai_success, preprocessed_result = preprocess_for_mcp_server(
-        user_input, tool_context
-    )
+    # Pass the full mcp_result (which contains intent) instead of just tool_context
+    ai_success, preprocessed_result = preprocess_for_mcp_server(user_input, mcp_result)
 
     # Log the preprocessing result but don't send to Telegram
     if ai_success and preprocessed_result.get("success", False):

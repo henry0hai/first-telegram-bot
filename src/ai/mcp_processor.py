@@ -278,13 +278,8 @@ class MCPAIProcessor:
             "program to",
             "python to",
             "python program",
-            "python code",
-            "calculate",
-            "computation",
             "math script",
             "calculation script",
-            "formula",
-            "algorithm",
         ]
 
         # Location patterns for weather queries
@@ -427,17 +422,17 @@ class MCPAIProcessor:
         # Get all intents with the highest score
         top_intents = [intent for intent, score in scores.items() if score == max_score]
 
-        # Priority order for tie-breaking (most specific first)
+        # Priority order for tie-breaking (RAG first per user preference)
         priority_order = [
-            IntentType.DYNAMIC_TOOL,  # Highest priority for script creation
+            IntentType.RAG_QUERY,  # Highest priority per user preference for ties
+            IntentType.DYNAMIC_TOOL,  # High priority for script creation
             IntentType.TASK_SCHEDULER,  # High priority for scheduling
             IntentType.WEATHER,  # Specific domain
             IntentType.BUDGET_FINANCE,  # Specific domain
+            IntentType.SYSTEM_INFO,  # Specific domain
             IntentType.EMAIL_COMMUNICATION,  # Specific domain
             IntentType.TRANSLATION_LANGUAGE,  # Specific domain
-            IntentType.SYSTEM_INFO,  # More general
             IntentType.SEARCH_QUERY,  # More general
-            IntentType.RAG_QUERY,  # Most general (lowest priority)
         ]
 
         # Select the highest priority intent among tied scores

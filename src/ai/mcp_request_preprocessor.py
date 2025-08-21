@@ -335,7 +335,7 @@ def preprocess_for_mcp_server(
     user_query: str, context: Dict, chat_id: Optional[str] = None
 ) -> Tuple[bool, Dict]:
     """
-    Pre-process user request for MCP server
+    Pre-process user request for MCP server - ONLY for DYNAMIC_TOOL intents
 
     Args:
         user_query: The user's request
@@ -348,5 +348,15 @@ def preprocess_for_mcp_server(
     # Add intent type to context for preprocessing
     if "intent" in context and hasattr(context["intent"], "value"):
         context["intent_type"] = context["intent"].value
+
+    # SAFETY CHECK: Only preprocess DYNAMIC_TOOL intents
+    # intent_type = context.get("intent_type", "unknown")
+    # if intent_type != "dynamic_tool":
+    #     logger.warning(f"Preprocessing called for non-dynamic intent: {intent_type}")
+    #     return False, {
+    #         "success": False,
+    #         "error": f"Preprocessing not supported for intent: {intent_type}",
+    #         "original_query": user_query,
+    #     }
 
     return mcp_request_preprocessor.preprocess_mcp_request(user_query, context, chat_id)
