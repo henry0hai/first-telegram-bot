@@ -19,6 +19,7 @@ HF_API_KEY = os.getenv("HF_API_KEY")
 N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL")
 QDRANT_API_URL = os.getenv("QDRANT_API_URL", "http://localhost:6333")
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
+REDIS_URL = os.getenv("REDIS_URL")
 
 # Validate environment variables
 if not all([TELEGRAM_BOT_TOKEN, ADMIN_ID, WEATHER_API_KEY, CITIES]):
@@ -64,6 +65,7 @@ class BotConfig:
         self.n8n_webhook_url = N8N_WEBHOOK_URL
         self.qdrant_api_url = QDRANT_API_URL
         self.qdrant_api_key = QDRANT_API_KEY
+        self.redis_url = REDIS_URL
 
 
 config = BotConfig()

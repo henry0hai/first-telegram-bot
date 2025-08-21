@@ -308,29 +308,36 @@ class MCPAIProcessor:
 
     def _detect_scheduler_type(self, text_lower: str) -> str:
         """Detect the type of scheduler request"""
-        # Check for cancel/list operations first (highest priority)
-        if any(word in text_lower for word in ["cancel", "remove", "delete", "stop"]):
+        # Use word boundaries and concrete patterns to avoid false positives like "every" in "everyone"
+        # Cancel/list operations first
+        if re.search(r"\b(cancel|remove|delete|stop)\b", text_lower):
             return "cancel"
-        elif any(word in text_lower for word in ["list", "show", "my tasks", "tasks"]):
+        if re.search(r"\b(list|show)\b|\bmy\s+tasks\b|\btasks\b", text_lower):
             return "list"
-        # Check for recurring patterns (high priority)
-        elif any(
-            word in text_lower for word in ["every", "remind", "recurring", "repeat"]
+
+        # Recurring reminder (e.g., "every 25 minutes", "remind me every hour")
+        if re.search(r"\bevery\b", text_lower) and re.search(
+            r"\b(second|seconds|minute|minutes|hour|hours|day|days|week|weeks)\b",
+            text_lower,
         ):
             return "reminder"
-        # Check for alarm patterns (specific patterns including "alarm", "wake", "after", "in X time")
-        elif any(word in text_lower for word in ["alarm", "wake me"]) or re.search(
-            r"\bafter\s+\d+|\bin\s+\d+\s+(second|minute|hour)", text_lower
+        if re.search(r"\b(remind|recurring|repeat)\b", text_lower):
+            return "reminder"
+
+        # Alarm: after/in X time or explicit "alarm"/"wake me"
+        if re.search(r"\balarm\b|\bwake\s+me\b", text_lower) or re.search(
+            r"\b(after|in)\s+\d+\s*(second|seconds|minute|minutes|hour|hours)\b",
+            text_lower,
         ):
             return "alarm"
-        # Check for absolute time patterns (notification)
-        elif any(
-            word in text_lower
-            for word in ["at", "on", "next week", "tomorrow", "schedule"]
-        ):
+
+        # Notification with absolute time (avoid bare 'at')
+        if re.search(r"\b(next\s+week|tomorrow)\b", text_lower):
             return "notification"
-        else:
-            return "unknown"
+        if re.search(r"\bat\s+\d{1,2}(:\d{2})?\s*(am|pm)?\b", text_lower):
+            return "notification"
+
+        return "unknown"
 
     def _detect_tool_type(self, text_lower: str) -> str:
         """Detect the type of dynamic tool request"""
@@ -388,9 +395,9 @@ class MCPAIProcessor:
             1 for keyword in self.translation_keywords if keyword in text_lower
         )
 
-        scheduler_score = sum(
-            1 for keyword in self.scheduler_keywords if keyword in text_lower
-        )
+        # Scheduler is special: use the concrete type detector to avoid substring false positives
+        scheduler_type = self._detect_scheduler_type(text_lower)
+        scheduler_score = 1 if scheduler_type != "unknown" else 0
 
         dynamic_tool_score = sum(
             1 for keyword in self.dynamic_tool_keywords if keyword in text_lower
@@ -504,7 +511,7 @@ class MCPAIProcessor:
                 "extracted_keywords": [
                     kw for kw in self.scheduler_keywords if kw in text_lower
                 ],
-                "scheduler_type": self._detect_scheduler_type(text_lower),
+                "scheduler_type": scheduler_type,
             }
         else:  # RAG_QUERY
             context = {

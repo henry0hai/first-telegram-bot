@@ -1,8 +1,8 @@
 # run.py
-# from src.core.bot import main
+import asyncio
 
 # for mcp AI processing
 from src.core.mcp_bot import main
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

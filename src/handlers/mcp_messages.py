@@ -1,124 +1,427 @@
 # src/handlers/mcp_messages.py - MCP-enhanced message handlers
 import aiohttp
+import uuid
+from datetime import datetime, timezone
 from typing import Tuple
+from collections import deque
 
 from telegram import Update
 from telegram.ext import ContextTypes
 from config.config import config
 from src.ai.mcp_processor import process_for_mcp_ai, IntentType
 from src.ai.mcp_request_preprocessor import preprocess_for_mcp_server
+from src.ai.mcp_instructions import get_mcp_instructions, get_intent_guidance
 from src.handlers.scheduler_handler import handle_scheduler_command
+from src.handlers.conversation_commands import handle_clear_intent_in_message
+from src.services.conversation_history import conversation_service
+from src.services.conversation_processor import conversation_processor
+from src.services.qdrant_conversation_manager import qdrant_conversation_manager
 from src.utils.logging_utils import get_logger
 
 logger = get_logger(__name__)
 
+# Simple in-memory dedupe for Telegram message processing
+_processed_messages = set()
+_processed_order = deque(maxlen=500)
+
 
 # MCP-enhanced text handler
 async def handle_mcp_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Enhanced text handler that uses MCP AI preprocessing"""
+    """Enhanced text handler that uses MCP AI preprocessing with conversation history"""
     user_input = update.message.text
-    user_id = update.message.from_user.id
+    chat_id = update.effective_chat.id
+    msg_id = update.message.message_id
+    dedupe_key = f"{chat_id}:{msg_id}"
+
+    # Drop duplicate deliveries of the same Telegram message
+    if dedupe_key in _processed_messages:
+        return
+    # Evict oldest if at capacity to keep set and deque in sync
+    if len(_processed_order) == _processed_order.maxlen:
+        oldest = _processed_order.popleft()
+        _processed_messages.discard(oldest)
+    _processed_messages.add(dedupe_key)
+    _processed_order.append(dedupe_key)
+    user_id = str(update.message.from_user.id)
     username = update.message.from_user.username or "Unknown"
 
-    # Process with MCP AI preprocessing
-    mcp_result = process_for_mcp_ai(user_input)
+    try:
+        # Check if user wants to clear conversation history
+        if await handle_clear_intent_in_message(update, context):
+            return  # Early exit if clear intent was handled
 
-    logger.info(
-        f"MCP processed query - Intent: {mcp_result['intent'].value}, User: {username}"
-    )
-
-    # Send immediate feedback for DYNAMIC_TOOL requests (before preprocessing)
-    if mcp_result["intent"] == IntentType.DYNAMIC_TOOL:
-        await update.message.reply_text(
-            "🛠️ Creating and executing your custom script..."
+        # Get intelligent conversation context using the enhanced processor
+        conversation_context_data = (
+            await conversation_processor.process_conversation_for_context(
+                user_id=user_id, current_message=user_input, max_context_length=3000
+            )
         )
 
-    # Handle scheduler requests directly (no webhook needed for local scheduling)
-    if mcp_result["intent"] == IntentType.TASK_SCHEDULER:
-        await handle_scheduler_command(update, context, mcp_result["context"])
-        return  # Exit early for scheduler commands
+        conversation_context = conversation_context_data.get("context_text", "")
+        context_summary = conversation_context_data.get("context_summary", "")
+        relevant_topics = conversation_context_data.get("relevant_topics", [])
+        confidence_score = conversation_context_data.get("confidence_score", 0.0)
 
-    # Handle dynamic tool requests with preprocessing (user already got feedback)
-    if mcp_result["intent"] == IntentType.DYNAMIC_TOOL:
-        success, preprocessed_data = await _handle_dynamic_tool_request_enhanced(
-            update, context, mcp_result, user_input, user_id
-        )
-
-        # Use preprocessed data for webhook if preprocessing was successful
-        if success and preprocessed_data.get("success", False):
-            logger.info("Using preprocessed MCP request for webhook")
-            # Update the payload with preprocessed request
-            mcp_result["preprocessed"] = {
-                "tool_calls": preprocessed_data.get("tool_calls", []),
-                "reasoning": preprocessed_data.get("reasoning", ""),
-                "model_used": preprocessed_data.get("model_used", "deepseek-r1:7b"),
-            }
-        else:
-            logger.info("Using basic preprocessing fallback")
-
-    # Send enhanced payload to N8N webhook if configured
-    webhook_url = config.n8n_webhook_url
-    if webhook_url:
-        payload = {
-            "message": {
-                "text": user_input,
-                "mcp_enhanced": {
-                    "intent": mcp_result["intent"].value,
-                    "context": mcp_result["context"],
-                    "mcp_prompt": mcp_result["mcp_prompt"],
-                    "original_query": mcp_result["original_query"],
-                },
-            },
-            "user": {"id": user_id, "username": username},
-        }
-
-        # Add preprocessed data to payload if available
-        if "preprocessed" in mcp_result:
-            payload["message"]["mcp_enhanced"]["preprocessed"] = mcp_result[
-                "preprocessed"
-            ]
+        # Enhanced user input with conversation context (only if confidence is high enough)
+        enhanced_input = user_input
+        if conversation_context and confidence_score > 0.3:
+            enhanced_input = (
+                f"{conversation_context}\n### Current Message:\n{user_input}"
+            )
             logger.info(
-                f"Enhanced payload with {len(mcp_result['preprocessed'].get('tool_calls', []))} preprocessed tool calls"
+                f"Enhanced context for {username}: {len(conversation_context)} chars, "
+                f"confidence: {confidence_score:.2f}, topics: {relevant_topics[:3]}"
             )
 
+        # Process with MCP AI preprocessing using ONLY the raw user input to avoid leaking prior context
+        mcp_result = process_for_mcp_ai(user_input)
+        # But keep original user input in the result for webhook
+        mcp_result["original_user_input"] = user_input
+
+        # Contextual fallback: if scheduler was falsely triggered by generic words and
+        # we have strong conversation context, prefer RAG for follow-up phrases.
         try:
-            # Debug: Log the actual payload being sent
-            logger.info(
-                f"Sending webhook payload for intent {mcp_result['intent'].value}:"
+            text_lower = user_input.lower()
+            follow_up = any(
+                phrase in text_lower
+                for phrase in [
+                    "tell me more",
+                    "tell me more about",
+                    "more about",
+                    "explain more",
+                    "could you elaborate",
+                    "what about",
+                ]
             )
-            logger.info(f"Payload keys: {list(payload.keys())}")
-            logger.info(f"Message keys: {list(payload['message'].keys())}")
-            if "mcp_enhanced" in payload["message"]:
+            if (
+                mcp_result["intent"] == IntentType.TASK_SCHEDULER
+                and follow_up
+                and confidence_score > 0.3
+            ):
                 logger.info(
-                    f"MCP enhanced keys: {list(payload['message']['mcp_enhanced'].keys())}"
+                    "Overriding scheduler intent to RAG due to follow-up phrase and strong context"
+                )
+                mcp_result["intent"] = IntentType.RAG_QUERY
+                # Carry the original query as the RAG query
+                mcp_result["context"] = {
+                    "query": user_input,
+                    "reason": "contextual_follow_up",
+                }
+        except Exception:
+            pass
+
+        logger.info(
+            f"MCP processed query - Intent: {mcp_result['intent'].value}, User: {username}"
+        )
+
+        # Send immediate feedback for DYNAMIC_TOOL requests (before preprocessing)
+        if mcp_result["intent"] == IntentType.DYNAMIC_TOOL:
+            await update.message.reply_text(
+                "🛠️ Creating and executing your custom script..."
+            )
+
+        # Handle scheduler requests directly (no webhook needed for local scheduling)
+        if mcp_result["intent"] == IntentType.TASK_SCHEDULER:
+            await handle_scheduler_command(update, context, mcp_result["context"])
+            # Store conversation for scheduler commands too
+            await conversation_service.add_conversation(
+                user_id=user_id,
+                username=username,
+                user_message=user_input,
+                bot_response="Scheduler command processed",
+                intent=mcp_result["intent"].value,
+            )
+            return  # Exit early for scheduler commands
+
+        # Handle dynamic tool requests with preprocessing (user already got feedback)
+        if mcp_result["intent"] == IntentType.DYNAMIC_TOOL:
+            success, preprocessed_data = await _handle_dynamic_tool_request_enhanced(
+                update, context, mcp_result, user_input, user_id
+            )
+
+            # Use preprocessed data for webhook if preprocessing was successful
+            if success and preprocessed_data.get("success", False):
+                logger.info("Using preprocessed MCP request for webhook")
+                # Update the payload with preprocessed request
+                mcp_result["preprocessed"] = {
+                    "tool_calls": preprocessed_data.get("tool_calls", []),
+                    "reasoning": preprocessed_data.get("reasoning", ""),
+                    "model_used": preprocessed_data.get("model_used", "deepseek-r1:7b"),
+                }
+            else:
+                logger.info("Using basic preprocessing fallback")
+
+        # Send enhanced payload to N8N webhook if configured
+        webhook_url = config.n8n_webhook_url
+        if webhook_url:
+            request_id = str(uuid.uuid4())
+            # Provide previous conversation text explicitly for downstream prompts
+            prev_conv_text = (
+                conversation_context
+                if conversation_context and len(conversation_context) < 4000
+                else (
+                    (conversation_context[:4000] + "...[truncated]")
+                    if conversation_context
+                    else ""
+                )
+            )
+
+            # Build a clean MCP prompt without embedding conversation history
+            base_prompt = get_mcp_instructions()
+            guidance = get_intent_guidance(mcp_result["intent"].value)
+            clean_user_prompt = f"\n** USER QUERY **\n{user_input}\n"
+            payload_mcp_prompt = base_prompt + guidance + clean_user_prompt
+
+            # Sanitize context passed to mcp_enhanced: strictly include only the raw user query
+            cleaned_context = {"query": user_input}
+
+            # Build query_object (tool + parameters suggestion) based on intent & query
+            intent_value = mcp_result["intent"].value
+            chosen_tool = None
+            parameters = {}
+
+            q_lower = user_input.lower()
+            if intent_value == "system_info":
+                chosen_tool = "system_info"
+            elif intent_value == "dynamic_tool":
+                chosen_tool = "generic_tool_creation"
+                parameters = {
+                    "user_request": user_input,
+                    "preferred_language": "auto",
+                    "send_to_telegram": True,
+                    "chat_id": str(chat_id),
+                }
+            elif intent_value == "weather":
+                chosen_tool = "get_weather"
+                # Simple location extraction: look for 'weather in/for <location>'
+                import re as _re  # local import to avoid top-level pollution
+
+                loc_match = _re.search(
+                    r"weather\s+(?:in|for)\s+(.+?)(?:[\?\.!,]|$)", q_lower
+                )
+                location = None
+                if loc_match:
+                    location = loc_match.group(1).strip()
+                # If not found, attempt last two words (heuristic) excluding leading 'what is'
+                if not location:
+                    tokens = [
+                        t
+                        for t in q_lower.split()
+                        if t
+                        not in {"what", "is", "the", "current", "please", "tell", "me"}
+                    ]
+                    if len(tokens) >= 2:
+                        location = " ".join(tokens[-2:])
+                parameters = {"location": location or ""}
+            elif intent_value == "search_query":
+                chosen_tool = "search_google"
+                parameters = {"query": user_input}
+            elif intent_value == "rag_query":
+                chosen_tool = "rag_retrieve"
+                parameters = {"query": user_input}
+            elif intent_value == "budget_finance":
+                chosen_tool = "get_budget_summary"
+            elif intent_value == "email_communication":
+                chosen_tool = "send_email"
+                parameters = {"to": "", "subject": "", "body": user_input}
+            elif intent_value == "translation_language":
+                chosen_tool = "translate_text"
+                parameters = {"text": user_input, "target_language": ""}
+            elif intent_value == "task_scheduler":
+                # Usually handled earlier, but include fallback descriptor
+                chosen_tool = "create_reminder"
+                parameters = {"time": "", "message": user_input}
+            else:
+                chosen_tool = "unknown"
+                parameters = {"raw": user_input}
+
+            query_object = {
+                "intent": intent_value,
+                "query": cleaned_context["query"],
+                "mcp_tool": chosen_tool,
+                "parameters": parameters,
+            }
+
+            payload = {
+                "message": {
+                    "text": mcp_result.get(
+                        "original_user_input", user_input
+                    ),  # Use original input for webhook
+                    "enhanced_text": (
+                        enhanced_input if conversation_context else None
+                    ),  # Include enhanced version if context was added
+                    "previous_conversation": prev_conv_text,
+                    "conversation_context": {
+                        "has_context": bool(conversation_context),
+                        "context_messages_count": conversation_context_data.get(
+                            "messages_count", 0
+                        ),
+                        "confidence_score": confidence_score,
+                        "relevant_topics": relevant_topics,
+                        "context_summary": context_summary,
+                        "context_text": (
+                            conversation_context
+                            if len(conversation_context) < 2000
+                            else conversation_context[:2000] + "...[truncated]"
+                        ),
+                    },
+                    "mcp_enhanced": {
+                        "intent": mcp_result["intent"].value,
+                        "context": cleaned_context,
+                        "mcp_prompt": payload_mcp_prompt,
+                        "original_query": user_input,
+                        "query_object": query_object,
+                    },
+                },
+                "user": {"id": user_id, "username": username},
+                "meta": {
+                    "request_id": request_id,
+                    "intent": mcp_result["intent"].value,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "respond_via": "n8n",  # hint for downstream
+                    "strict_single_tool": False,
+                    "previous_context_for_reference_only": True,
+                    "sanitized_mcp_context": True,
+                },
+            }
+
+            # Add preprocessed data to payload if available
+            if "preprocessed" in mcp_result:
+                payload["message"]["mcp_enhanced"]["preprocessed"] = mcp_result[
+                    "preprocessed"
+                ]
+                logger.info(
+                    f"Enhanced payload with {len(mcp_result['preprocessed'].get('tool_calls', []))} preprocessed tool calls"
                 )
 
-            async with aiohttp.ClientSession() as session:
-                async with session.post(webhook_url, json=payload) as resp:
-                    if resp.status != 200:
-                        logger.warning(f"N8N webhook returned status {resp.status}")
-                    else:
-                        logger.info(f"Successfully sent MCP-enhanced payload to N8N")
-        except Exception as e:
-            logger.error(f"Failed to send to N8N webhook: {e}")
+            try:
+                # Debug: Log the actual payload being sent
+                logger.info(
+                    f"Sending webhook payload for intent {mcp_result['intent'].value}:"
+                )
+                logger.info(f"Payload keys: {list(payload.keys())}")
+                logger.info(f"Message keys: {list(payload['message'].keys())}")
+                if "mcp_enhanced" in payload["message"]:
+                    logger.info(
+                        f"MCP enhanced keys: {list(payload['message']['mcp_enhanced'].keys())}"
+                    )
+                    try:
+                        logger.info(
+                            "Sanitized mcp_enhanced.context.query: %s",
+                            payload["message"]["mcp_enhanced"]["context"].get(
+                                "query", ""
+                            ),
+                        )
+                        logger.info(
+                            "Sanitized mcp_enhanced.context keys: %s",
+                            list(payload["message"]["mcp_enhanced"]["context"].keys()),
+                        )
+                    except Exception:
+                        pass
+                logger.info(f"Webhook request_id: {request_id}")
 
-    # Provide user feedback for other intents (DYNAMIC_TOOL already got immediate feedback)
-    intent_messages = {
-        IntentType.RAG_QUERY: "🔍 Processing your document-related question...",
-        IntentType.SEARCH_QUERY: "🌐 Searching for the latest information...",
-        IntentType.SYSTEM_INFO: "💻 Getting system information...",
-        IntentType.WEATHER: f"🌤️ Getting weather information...",
-        IntentType.BUDGET_FINANCE: "💰 Processing your budget/finance request...",
-        IntentType.EMAIL_COMMUNICATION: "📧 Handling your email request...",
-        IntentType.TRANSLATION_LANGUAGE: "🌍 Processing translation request...",
-        IntentType.TASK_SCHEDULER: "⏰ Creating your scheduled task...",
-        IntentType.UNKNOWN: "🤖 Processing your request...",
-    }
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(webhook_url, json=payload) as resp:
+                        webhook_response = ""
+                        if resp.status != 200:
+                            logger.warning(f"N8N webhook returned status {resp.status}")
+                            webhook_response = f"Webhook error: {resp.status}"
+                        else:
+                            logger.info(
+                                f"Successfully sent MCP-enhanced payload to N8N"
+                            )
+                            try:
+                                response_data = await resp.text()
+                                webhook_response = (
+                                    response_data or "Processed successfully"
+                                )
+                            except:
+                                webhook_response = "Processed successfully"
 
-    feedback_message = intent_messages.get(
-        mcp_result["intent"], intent_messages[IntentType.UNKNOWN]
-    )
-    await update.message.reply_text(feedback_message)
+                        # Store conversation with webhook response
+                        await conversation_service.add_conversation(
+                            user_id=user_id,
+                            username=username,
+                            user_message=user_input,
+                            bot_response=webhook_response,
+                            intent=mcp_result["intent"].value,
+                        )
+
+                        # ENHANCED: Also store in comprehensive Qdrant for MCP server access
+                        await qdrant_conversation_manager.store_conversation(
+                            user_id=user_id,
+                            username=username,
+                            user_message=user_input,
+                            bot_response=webhook_response,
+                            intent=mcp_result["intent"].value,
+                            context_used=bool(
+                                conversation_context and confidence_score > 0.3
+                            ),
+                            conversation_turn=conversation_context_data.get(
+                                "messages_count", 0
+                            ),
+                        )
+
+            except Exception as e:
+                logger.error(f"Failed to send to N8N webhook: {e}")
+                # Store conversation even if webhook fails
+                await conversation_service.add_conversation(
+                    user_id=user_id,
+                    username=username,
+                    user_message=user_input,
+                    bot_response=f"Webhook error: {str(e)}",
+                    intent=mcp_result["intent"].value,
+                )
+
+                # ENHANCED: Also store in comprehensive Qdrant for MCP server access
+                await qdrant_conversation_manager.store_conversation(
+                    user_id=user_id,
+                    username=username,
+                    user_message=user_input,
+                    bot_response=f"Webhook error: {str(e)}",
+                    intent=mcp_result["intent"].value,
+                    context_used=bool(conversation_context and confidence_score > 0.3),
+                    conversation_turn=conversation_context_data.get(
+                        "messages_count", 0
+                    ),
+                )
+
+        # Provide user feedback for other intents (DYNAMIC_TOOL already got immediate feedback)
+        intent_messages = {
+            IntentType.RAG_QUERY: "🔍 Processing your document-related question...",
+            IntentType.SEARCH_QUERY: "🌐 Searching for the latest information...",
+            IntentType.SYSTEM_INFO: "💻 Getting system information...",
+            IntentType.WEATHER: f"🌤️ Getting weather information...",
+            IntentType.BUDGET_FINANCE: "💰 Processing your budget/finance request...",
+            IntentType.EMAIL_COMMUNICATION: "📧 Handling your email request...",
+            IntentType.TRANSLATION_LANGUAGE: "🌍 Processing translation request...",
+            IntentType.TASK_SCHEDULER: "⏰ Creating your scheduled task...",
+            IntentType.UNKNOWN: "🤖 Processing your request...",
+        }
+
+        feedback_message = intent_messages.get(
+            mcp_result["intent"], intent_messages[IntentType.UNKNOWN]
+        )
+
+        # Add conversation context info to feedback if relevant
+        if conversation_context and confidence_score > 0.3:
+            msg_count = conversation_context_data.get("messages_count", 0)
+            feedback_message += f"\n\n📚 *Using context from {msg_count} previous messages (confidence: {confidence_score:.1f})*"
+
+        # If a webhook is configured and intent is RAG/SEARCH, let the webhook own the response to avoid duplicates
+        if config.n8n_webhook_url and mcp_result["intent"] in (
+            IntentType.RAG_QUERY,
+            IntentType.SEARCH_QUERY,
+        ):
+            return
+
+        await update.message.reply_text(feedback_message, parse_mode="Markdown")
+
+    except Exception as e:
+        logger.error(f"Error in handle_mcp_text: {e}")
+        await update.message.reply_text(
+            "❌ Sorry, I encountered an error processing your message. Please try again."
+        )
 
 
 async def _handle_dynamic_tool_request_enhanced(

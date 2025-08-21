@@ -4,6 +4,10 @@
 
 MCP_AI_INSTRUCTIONS = """You are an MCP tool selector. Your job is to identify the correct MCP tool and parameters for user requests.
 
+** Strict rules: **
+- Previous conversation/context is for SELECTION ONLY. Do NOT trigger additional tools based solely on prior messages.
+- Prefer RAG when the question relates to uploaded/known documents; otherwise use search.
+
 ** Available MCP Servers and Tools **
 
 ** System Info MCP Server **
