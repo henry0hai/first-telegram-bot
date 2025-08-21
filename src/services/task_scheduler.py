@@ -203,21 +203,27 @@ class TaskScheduler:
 
     def _detect_scheduler_type(self, text_lower: str) -> str:
         """Detect the type of scheduler request"""
-        if any(word in text_lower for word in ["alarm", "after", "in", "wake me"]):
-            return "alarm"
+        # Check for cancel/list operations first (highest priority)
+        if any(word in text_lower for word in ["cancel", "remove", "delete", "stop"]):
+            return "cancel"
+        elif any(word in text_lower for word in ["list", "show", "my tasks", "tasks"]):
+            return "list"
+        # Check for recurring patterns (high priority)
         elif any(
             word in text_lower for word in ["every", "remind", "recurring", "repeat"]
         ):
             return "reminder"
+        # Check for alarm patterns (specific patterns including "alarm", "wake", "after", "in X time")
+        elif any(word in text_lower for word in ["alarm", "wake me"]) or re.search(
+            r"\bafter\s+\d+|\bin\s+\d+\s+(second|minute|hour)", text_lower
+        ):
+            return "alarm"
+        # Check for absolute time patterns (notification)
         elif any(
             word in text_lower
             for word in ["at", "on", "next week", "tomorrow", "schedule"]
         ):
             return "notification"
-        elif any(word in text_lower for word in ["cancel", "remove", "delete", "stop"]):
-            return "cancel"
-        elif any(word in text_lower for word in ["list", "show", "my tasks", "tasks"]):
-            return "list"
         else:
             return "unknown"
 
@@ -411,7 +417,22 @@ class TaskScheduler:
             text += f"   Time: {task.scheduled_time.strftime('%Y-%m-%d %H:%M')}\n"
 
             if task.interval:
-                text += f"   Interval: {task.interval // 60} minutes\n"
+                if task.interval < 60:
+                    text += f"   Interval: {task.interval} seconds\n"
+                elif task.interval < 3600:
+                    minutes = task.interval // 60
+                    seconds = task.interval % 60
+                    if seconds > 0:
+                        text += f"   Interval: {minutes} minutes {seconds} seconds\n"
+                    else:
+                        text += f"   Interval: {minutes} minutes\n"
+                else:
+                    hours = task.interval // 3600
+                    minutes = (task.interval % 3600) // 60
+                    if minutes > 0:
+                        text += f"   Interval: {hours} hours {minutes} minutes\n"
+                    else:
+                        text += f"   Interval: {hours} hours\n"
 
             text += f"   ID: `{task_id}`\n\n"
 

@@ -218,13 +218,24 @@ class MCPAIProcessor:
         # New keyword category for dynamic tool creation
         self.dynamic_tool_keywords = [
             "create script",
+            "create a script",
             "create a simple script",
             "create simple python app",
             "generate code",
             "write script",
+            "write a script",
             "make a script",
+            "make script",
+            "build a script",
+            "build script",
+            "develop a script",
+            "develop script",
             "automation",
             "automate",
+            "automate server",
+            "automate system",
+            "server automation",
+            "system automation",
             "execute script",
             "run script",
             "bash script",
@@ -248,6 +259,17 @@ class MCPAIProcessor:
             "develop script",
             "programming",
             "scripting",
+            "generate bash",
+            "generate python",
+            "create bash",
+            "create python",
+            "write bash",
+            "write python",
+            "simple script",
+            "custom tool",
+            "script to",
+            "code to",
+            "program to",
         ]
 
         # Location patterns for weather queries
@@ -276,21 +298,27 @@ class MCPAIProcessor:
 
     def _detect_scheduler_type(self, text_lower: str) -> str:
         """Detect the type of scheduler request"""
-        if any(word in text_lower for word in ["alarm", "after", "in", "wake me"]):
-            return "alarm"
+        # Check for cancel/list operations first (highest priority)
+        if any(word in text_lower for word in ["cancel", "remove", "delete", "stop"]):
+            return "cancel"
+        elif any(word in text_lower for word in ["list", "show", "my tasks", "tasks"]):
+            return "list"
+        # Check for recurring patterns (high priority)
         elif any(
             word in text_lower for word in ["every", "remind", "recurring", "repeat"]
         ):
             return "reminder"
+        # Check for alarm patterns (specific patterns including "alarm", "wake", "after", "in X time")
+        elif any(word in text_lower for word in ["alarm", "wake me"]) or re.search(
+            r"\bafter\s+\d+|\bin\s+\d+\s+(second|minute|hour)", text_lower
+        ):
+            return "alarm"
+        # Check for absolute time patterns (notification)
         elif any(
             word in text_lower
             for word in ["at", "on", "next week", "tomorrow", "schedule"]
         ):
             return "notification"
-        elif any(word in text_lower for word in ["cancel", "remove", "delete", "stop"]):
-            return "cancel"
-        elif any(word in text_lower for word in ["list", "show", "my tasks", "tasks"]):
-            return "list"
         else:
             return "unknown"
 
@@ -362,7 +390,7 @@ class MCPAIProcessor:
             f"Intent scores - RAG: {rag_score}, Search: {search_score}, System: {system_score}, Weather: {weather_score}, Budget: {budget_score}, Email: {email_score}, Translation: {translation_score}, Scheduler: {scheduler_score}, Dynamic Tool: {dynamic_tool_score}"
         )
 
-        # Determine intent based on highest score
+        # Determine intent based on highest score with priority-based tie-breaking
         scores = {
             IntentType.RAG_QUERY: rag_score,
             IntentType.SEARCH_QUERY: search_score,
@@ -381,8 +409,30 @@ class MCPAIProcessor:
             # Default to RAG if no clear intent
             return IntentType.RAG_QUERY, {"query": text, "reason": "default_fallback"}
 
-        # Get the intent with highest score
-        intent = max(scores.keys(), key=lambda k: scores[k])
+        # Get all intents with the highest score
+        top_intents = [intent for intent, score in scores.items() if score == max_score]
+
+        # Priority order for tie-breaking (most specific first)
+        priority_order = [
+            IntentType.DYNAMIC_TOOL,  # Highest priority for script creation
+            IntentType.TASK_SCHEDULER,  # High priority for scheduling
+            IntentType.WEATHER,  # Specific domain
+            IntentType.BUDGET_FINANCE,  # Specific domain
+            IntentType.EMAIL_COMMUNICATION,  # Specific domain
+            IntentType.TRANSLATION_LANGUAGE,  # Specific domain
+            IntentType.SYSTEM_INFO,  # More general
+            IntentType.SEARCH_QUERY,  # More general
+            IntentType.RAG_QUERY,  # Most general (lowest priority)
+        ]
+
+        # Select the highest priority intent among tied scores
+        for priority_intent in priority_order:
+            if priority_intent in top_intents:
+                intent = priority_intent
+                break
+        else:
+            # Fallback if somehow no match (shouldn't happen)
+            intent = top_intents[0]
 
         # Extract additional context based on intent
         if intent == IntentType.WEATHER:

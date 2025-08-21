@@ -189,7 +189,7 @@ async def _handle_cancel_task(
     import re
 
     # Extract task ID from text
-    task_id_match = re.search(r"cancel\s+task\s+(\w+)", text.lower())
+    task_id_match = re.search(r"cancel\s+task\s+([a-zA-Z0-9_\.]+)", text.lower())
     if not task_id_match:
         await update.message.reply_text(
             "❌ Please specify a task ID to cancel.\n\n"
