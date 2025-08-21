@@ -14,6 +14,7 @@ class IntentType(Enum):
     RAG_QUERY = "rag_query"
     SEARCH_QUERY = "search_query"
     SYSTEM_INFO = "system_info"
+    DYNAMIC_TOOL = "dynamic_tool"
     WEATHER = "weather"
     BUDGET_FINANCE = "budget_finance"
     EMAIL_COMMUNICATION = "email_communication"
@@ -132,7 +133,6 @@ class MCPAIProcessor:
             "category",
             "tracking",
             "track",
-
         ]
 
         self.email_keywords = [
@@ -215,6 +215,41 @@ class MCPAIProcessor:
             "hourly",
         ]
 
+        # New keyword category for dynamic tool creation
+        self.dynamic_tool_keywords = [
+            "create script",
+            "create a simple script",
+            "create simple python app",
+            "generate code",
+            "write script",
+            "make a script",
+            "automation",
+            "automate",
+            "execute script",
+            "run script",
+            "bash script",
+            "python script",
+            "shell command",
+            "command line",
+            "server script",
+            "system script",
+            "file creation",
+            "generate file",
+            "create file",
+            "write file",
+            "make file",
+            "script generation",
+            "code generation",
+            "dynamic script",
+            "custom script",
+            "tool creation",
+            "create tool",
+            "build script",
+            "develop script",
+            "programming",
+            "scripting",
+        ]
+
         # Location patterns for weather queries
         self.location_patterns = [
             r"weather in (\w+(?:\s+\w+)*)",
@@ -259,6 +294,33 @@ class MCPAIProcessor:
         else:
             return "unknown"
 
+    def _detect_tool_type(self, text_lower: str) -> str:
+        """Detect the type of dynamic tool request"""
+        if any(
+            word in text_lower
+            for word in ["bash", "shell", "command line", "bash script"]
+        ):
+            return "bash"
+        elif any(word in text_lower for word in ["python", "py", "python script"]):
+            return "python"
+        elif any(
+            word in text_lower
+            for word in ["create file", "generate file", "write file", "make file"]
+        ):
+            return "file_creation"
+        elif any(
+            word in text_lower
+            for word in ["automation", "automate", "script generation"]
+        ):
+            return "automation"
+        elif any(
+            word in text_lower
+            for word in ["execute", "run", "execute script", "run script"]
+        ):
+            return "execution"
+        else:
+            return "auto"
+
     def detect_intent(self, text: str) -> Tuple[IntentType, Dict]:
         """
         Detect the intent of user input and extract relevant context
@@ -292,8 +354,12 @@ class MCPAIProcessor:
             1 for keyword in self.scheduler_keywords if keyword in text_lower
         )
 
+        dynamic_tool_score = sum(
+            1 for keyword in self.dynamic_tool_keywords if keyword in text_lower
+        )
+
         logger.info(
-            f"Intent scores - RAG: {rag_score}, Search: {search_score}, System: {system_score}, Weather: {weather_score}, Budget: {budget_score}, Email: {email_score}, Translation: {translation_score}, Scheduler: {scheduler_score}"
+            f"Intent scores - RAG: {rag_score}, Search: {search_score}, System: {system_score}, Weather: {weather_score}, Budget: {budget_score}, Email: {email_score}, Translation: {translation_score}, Scheduler: {scheduler_score}, Dynamic Tool: {dynamic_tool_score}"
         )
 
         # Determine intent based on highest score
@@ -301,6 +367,7 @@ class MCPAIProcessor:
             IntentType.RAG_QUERY: rag_score,
             IntentType.SEARCH_QUERY: search_score,
             IntentType.SYSTEM_INFO: system_score,
+            IntentType.DYNAMIC_TOOL: dynamic_tool_score,
             IntentType.WEATHER: weather_score,
             IntentType.BUDGET_FINANCE: budget_score,
             IntentType.EMAIL_COMMUNICATION: email_score,
@@ -333,6 +400,14 @@ class MCPAIProcessor:
                 "extracted_keywords": [
                     kw for kw in self.system_keywords if kw in text_lower
                 ],
+            }
+        elif intent == IntentType.DYNAMIC_TOOL:
+            context = {
+                "query": text,
+                "extracted_keywords": [
+                    kw for kw in self.dynamic_tool_keywords if kw in text_lower
+                ],
+                "tool_type": self._detect_tool_type(text_lower),
             }
         elif intent == IntentType.SEARCH_QUERY:
             context = {

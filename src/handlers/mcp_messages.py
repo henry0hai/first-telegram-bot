@@ -60,6 +60,7 @@ async def handle_mcp_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         IntentType.RAG_QUERY: "🔍 Processing your document-related question...",
         IntentType.SEARCH_QUERY: "🌐 Searching for the latest information...",
         IntentType.SYSTEM_INFO: "💻 Getting system information...",
+        IntentType.DYNAMIC_TOOL: "🛠️ Creating and executing your custom script...",
         IntentType.WEATHER: f"🌤️ Getting weather information{' for ' + mcp_result['context'].get('location', '') if mcp_result['context'].get('location') else ''}...",
         IntentType.BUDGET_FINANCE: "💰 Processing your budget/finance request...",
         IntentType.EMAIL_COMMUNICATION: "📧 Handling your email request...",

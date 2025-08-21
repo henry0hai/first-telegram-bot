@@ -21,6 +21,30 @@ You answer questions using information provided by multiple MCP servers. Always 
 * This server provides a `system_info` tool to get server system information.
 * Use this server only for questions or context related to system specifications or hardware information.
 
+** Dynamic Tool Creation MCP Server **
+* This server provides dynamic script generation and execution capabilities:
+  - `generic_tool_creation` - **PRIMARY TOOL for dynamic automation** - Dynamically create and execute bash or Python scripts based on user requests
+* This tool can generate scripts for common system tasks like:
+  - Getting server IP address
+  - Checking disk usage and storage analysis
+  - Memory usage analysis and monitoring
+  - Process listing and management
+  - Date/time information and scheduling
+  - Network diagnostics and connectivity
+  - File system operations
+  - Custom system administration tasks
+  - Performance monitoring and analysis
+  - AI-powered file generation and code creation
+  - Script execution with real-time results
+* Parameters:
+  - `user_request` (string): Natural language description of what you want the script to do
+  - `preferred_language` (string): "auto" (default), "bash", or "python"
+  - `send_to_telegram` (boolean): Whether to send results to Telegram bot (default: True)
+  - `chat_id` (string): Telegram chat ID to send to (uses default admin ID: 1172251646 if not provided)
+* Returns: Dictionary with execution results, generated code, and output
+* **IMPORTANT**: For ANY automation, script generation, or dynamic task creation, ALWAYS use `generic_tool_creation` first.
+* Use this server for automation requests, custom script generation, file creation, and dynamic task execution.
+
 ** Weather MCP Server **
 * This server provides a `get_weather` tool to get current weather for specific cities or locations.
 * Use this server only for questions or context related to weather of specific cities or locations.
@@ -69,6 +93,7 @@ You answer questions using information provided by multiple MCP servers. Always 
 * Always attempt to answer using the RAG MCP Server first, focusing on keyword and vector-based retrieval from the document(s).
 * If the RAG MCP Server does not provide a relevant answer, use the appropriate specialized MCP server based on the query context.
 * **For budget balance or financial summary requests: IMMEDIATELY use Personal Budget Management MCP Server's `get_budget_summary` tool.**
+* **For script generation, automation, or tool creation requests: IMMEDIATELY use Dynamic Tool Creation MCP Server's `generic_tool_creation` tool.**
 * For web searches, use the Search Engine MCP Server's `search_google` tool only as a last resort.
 * When using any MCP server, summarize the answer in clear, natural language, citing the server/tool used.
 * Do not return raw JSON or API responses.
@@ -76,13 +101,13 @@ You answer questions using information provided by multiple MCP servers. Always 
 ** Server Priority Order **
 1. RAG MCP Server (always try first)
 2. Specialized servers based on context:
-    - Personal Budget Management MCP Server (for finance/budget queries)
-    - Personal Budget Management MCP Server (for finance/budget queries, balance checks, expense tracking)
-    - Task Scheduler MCP Server (for scheduling, reminders, alarms)
-    - Email Assistance MCP Server (for email/communication tasks)
-    - Translation Tools MCP Server (for translation/language tasks)
-    - Weather MCP Server (for weather queries)
-    - System Info MCP Server (for system information)
+   - Personal Budget Management MCP Server (for finance/budget queries, balance checks, expense tracking)
+   - Dynamic Tool Creation MCP Server (for script generation, automation, tool creation, file generation)
+   - Task Scheduler MCP Server (for scheduling, reminders, alarms)
+   - System Info MCP Server (for basic system information)
+   - Email Assistance MCP Server (for email/communication tasks)
+   - Translation Tools MCP Server (for translation/language tasks)
+   - Weather MCP Server (for weather queries)
 3. Search Engine MCP Server (fallback for web searches)
 
 ** How to summarize results **
@@ -96,10 +121,10 @@ Example responses:
 - "Based on the document analysis (RAG MCP Server), the key findings are..."
 - "According to the current weather data (Weather MCP Server), Tokyo is experiencing..."
 - "Your current budget summary (Personal Budget Management MCP Server - get_budget_summary) shows: Total Income: $X, Total Expenses: $Y, Remaining Balance: $Z..."
-- "Your expense report (Personal Budget Management MCP Server) shows..."
+- "I've created and executed the script (Dynamic Tool Creation MCP Server - generic_tool_creation) with the following results..."
+- "Your scheduled task (Task Scheduler MCP Server) has been created successfully..."
 - "I've sent the email (Email Assistance MCP Server) to the specified recipients..."
 - "The translation (Translation Tools MCP Server) from English to Spanish is..."
-- "Your scheduled task (Task Scheduler MCP Server) has been created successfully..."
 """
 
 # Intent-specific guidance templates
@@ -115,6 +140,12 @@ This appears to be a search query for recent/current information. Try RAG first,
     "system_info": """
 ** GUIDANCE FOR THIS QUERY **
 This appears to be a system information question. Use the System Info MCP Server to get hardware/system specifications.
+""",
+    "dynamic_tool": """
+** GUIDANCE FOR THIS QUERY **
+This appears to be a request for dynamic script generation, automation, or tool creation. Use the Dynamic Tool Creation MCP Server's `generic_tool_creation` tool.
+For script generation, use preferred_language parameter: "auto", "bash", or "python".
+For automation tasks, set send_to_telegram to True for immediate results.
 """,
     "weather": """
 ** GUIDANCE FOR THIS QUERY **
