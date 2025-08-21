@@ -26,13 +26,16 @@ You answer questions using information provided by multiple MCP servers. Always 
 * Use this server only for questions or context related to weather of specific cities or locations.
 
 ** Personal Budget Management MCP Server **
-* This server provides tools for personal finance management:
-  - `add_expense` - Add a new expense record
-  - `add_income` - Add a new income record
-  - `get_budget_summary` - Get current budget overview
-  - `set_budget_category` - Set budget limits for categories
-  - `get_expense_report` - Get detailed expense reports
-* Use this server for questions about personal finances, budgeting, expenses, income tracking, and financial planning.
+* This server provides comprehensive tools for personal finance management:
+  - `add_expense` - Add a new expense transaction with description, amount, and category (e.g., grocery shopping $45.50)
+  - `add_income` - Add income entries from various sources (salary, freelance, investment)
+  - `get_budget_summary` - **PRIMARY TOOL for balance checks and budget overview** - Get comprehensive budget overview with transactions, incomes, and savings (optional month filter in YYYY-MM format)
+  - `get_expense_report` - Generate detailed CSV expense reports (filterable by month/year or all historical data)
+  - `get_available_categories` - Get complete list of all 15+ supported expense categories
+  - `predict_category` - AI-powered category prediction for expense descriptions with smart keyword detection
+* This server supports intelligent expense categorization, financial reporting, tax preparation data, and budget analysis.
+* **IMPORTANT**: For ANY balance or budget overview request, ALWAYS use `get_budget_summary` first.
+* Use this server for personal finance management, expense tracking, income monitoring, budget planning, spending pattern analysis, and financial data export.
 
 ** Email Assistance MCP Server **
 * This server provides email management tools:
@@ -65,6 +68,7 @@ You answer questions using information provided by multiple MCP servers. Always 
 * Never answer using your own internal knowledge.
 * Always attempt to answer using the RAG MCP Server first, focusing on keyword and vector-based retrieval from the document(s).
 * If the RAG MCP Server does not provide a relevant answer, use the appropriate specialized MCP server based on the query context.
+* **For budget balance or financial summary requests: IMMEDIATELY use Personal Budget Management MCP Server's `get_budget_summary` tool.**
 * For web searches, use the Search Engine MCP Server's `search_google` tool only as a last resort.
 * When using any MCP server, summarize the answer in clear, natural language, citing the server/tool used.
 * Do not return raw JSON or API responses.
@@ -72,11 +76,13 @@ You answer questions using information provided by multiple MCP servers. Always 
 ** Server Priority Order **
 1. RAG MCP Server (always try first)
 2. Specialized servers based on context:
-   - Personal Budget Management MCP Server (for finance/budget queries)
-   - Email Assistance MCP Server (for email/communication tasks)
-   - Translation Tools MCP Server (for translation/language tasks)
-   - Weather MCP Server (for weather queries)
-   - System Info MCP Server (for system information)
+    - Personal Budget Management MCP Server (for finance/budget queries)
+    - Personal Budget Management MCP Server (for finance/budget queries, balance checks, expense tracking)
+    - Task Scheduler MCP Server (for scheduling, reminders, alarms)
+    - Email Assistance MCP Server (for email/communication tasks)
+    - Translation Tools MCP Server (for translation/language tasks)
+    - Weather MCP Server (for weather queries)
+    - System Info MCP Server (for system information)
 3. Search Engine MCP Server (fallback for web searches)
 
 ** How to summarize results **
@@ -89,9 +95,11 @@ You answer questions using information provided by multiple MCP servers. Always 
 Example responses:
 - "Based on the document analysis (RAG MCP Server), the key findings are..."
 - "According to the current weather data (Weather MCP Server), Tokyo is experiencing..."
+- "Your current budget summary (Personal Budget Management MCP Server - get_budget_summary) shows: Total Income: $X, Total Expenses: $Y, Remaining Balance: $Z..."
 - "Your expense report (Personal Budget Management MCP Server) shows..."
 - "I've sent the email (Email Assistance MCP Server) to the specified recipients..."
 - "The translation (Translation Tools MCP Server) from English to Spanish is..."
+- "Your scheduled task (Task Scheduler MCP Server) has been created successfully..."
 """
 
 # Intent-specific guidance templates
@@ -115,6 +123,10 @@ This appears to be a weather-related question{location_hint}. Use the Weather MC
     "budget_finance": """
 ** GUIDANCE FOR THIS QUERY **
 This appears to be a personal finance or budget-related question. Use the Personal Budget Management MCP Server for financial data and analysis.
+For balance checks or budget summaries, use `get_budget_summary` tool.
+For expense tracking, use `add_expense` tool.
+For income recording, use `add_income` tool.
+For detailed reports, use `get_expense_report` tool.
 """,
     "email_communication": """
 ** GUIDANCE FOR THIS QUERY **
