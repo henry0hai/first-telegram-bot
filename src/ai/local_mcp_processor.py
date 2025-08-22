@@ -9,6 +9,7 @@ from typing import Dict, Optional, Tuple
 from openai import OpenAI
 from src.ai.mcp_instructions import get_mcp_instructions, get_intent_guidance
 from src.utils.logging_utils import get_logger
+from config.config import ADMIN_ID
 
 logger = get_logger(__name__)
 
@@ -91,7 +92,7 @@ class LocalMCPProcessor:
 User Request Type: Dynamic Tool Creation
 Tool Type: {context.get('tool_type', 'auto')}
 Detected Keywords: {context.get('extracted_keywords', [])}
-Chat ID: {chat_id or '1172251646'}
+Chat ID: {chat_id or ADMIN_ID}
 
 ** CRITICAL EXECUTION INSTRUCTIONS **
 This is being processed locally for immediate execution. Follow these rules EXACTLY:

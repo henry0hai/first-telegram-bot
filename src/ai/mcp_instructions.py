@@ -2,6 +2,8 @@
 # MCP AI Agent Instructions
 # This file contains the instructions for the MCP AI Agent with support for multiple MCP servers
 
+from config.config import ADMIN_ID
+
 MCP_AI_INSTRUCTIONS = """You are an MCP tool selector. Your job is to identify the correct MCP tool and parameters for user requests.
 
 ** Available MCP Servers and Tools **
@@ -68,7 +70,7 @@ User: "create a script to get system information"
 Response:
 Intent: dynamic_tool
 Tool: generic_tool_creation
-Parameters: user_request: "create a script to get system information", preferred_language: "auto", send_to_telegram: true, chat_id: "1172251646"
+Parameters: user_request: "create a script to get system information", preferred_language: "auto", send_to_telegram: true, chat_id: "<your_admin_id>"
 """
 
 # Intent-specific guidance templates

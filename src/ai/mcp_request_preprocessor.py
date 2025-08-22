@@ -1,12 +1,14 @@
 # src/ai/mcp_request_preprocessor.py
 # MCP request pre-processor using Ollama for enhanced webhook payloads
 
+
 import json
 import subprocess
 from typing import Dict, Optional, Tuple
 from openai import OpenAI
 from src.ai.mcp_instructions import get_mcp_instructions, get_intent_guidance
 from src.utils.logging_utils import get_logger
+from config.config import ADMIN_ID
 
 logger = get_logger(__name__)
 
@@ -97,7 +99,7 @@ Your job is to analyze the user's request and create a structured MCP tool call 
 Intent Type: {context.get("intent_type", "dynamic_tool")} (MUST use generic_tool_creation tool)
 Tool Type: {context.get('tool_type', 'auto')}
 Detected Keywords: {context.get('extracted_keywords', [])}
-Chat ID: {chat_id or '1172251646'}
+Chat ID: {chat_id or ADMIN_ID}
 
 ** TASK INSTRUCTIONS **
 
@@ -117,7 +119,7 @@ Format your response as a JSON structure like this:
         "user_request": "create a Python script to calculate cylinder volume and surface area with radius 6 and height 4",
         "preferred_language": "python",
         "send_to_telegram": true,
-        "chat_id": "{chat_id or '1172251646'}"
+        "chat_id": "{chat_id or ADMIN_ID}"
     }},
     "reasoning": "DYNAMIC_TOOL request requires generic_tool_creation tool. User wants Python code for mathematical calculations with specific parameters.",
     "expected_outcome": "A working Python script that calculates and displays cylinder volume and surface area"
@@ -237,7 +239,7 @@ Create the structured MCP tool call using generic_tool_creation following the JS
                 "user_request": user_query,
                 "preferred_language": "python" if tool_type == "python" else "auto",
                 "send_to_telegram": True,
-                "chat_id": chat_id or "1172251646",
+                "chat_id": chat_id or ADMIN_ID,
             }
             reasoning = f"DYNAMIC_TOOL request fallback: using generic_tool_creation with tool type: {tool_type}"
 
@@ -304,7 +306,7 @@ Create the structured MCP tool call using generic_tool_creation following the JS
                 "user_request": user_query,
                 "preferred_language": "auto",
                 "send_to_telegram": True,
-                "chat_id": chat_id or "1172251646",
+                "chat_id": chat_id or ADMIN_ID,
             }
             reasoning = f"General request preprocessing for intent: {intent_type}"
 
