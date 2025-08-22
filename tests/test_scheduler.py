@@ -72,8 +72,14 @@ def test_scheduler():
         message = scheduler.extract_task_message(phrase)
         print(f"   '{phrase}' -> '{message}'")
 
-    # Test 5: Scheduler type detection
-    print("\n5️⃣ Testing Scheduler Type Detection:")
+    # Test 5: Scheduler type detection and MCP intent integration
+    print("\n5️⃣ Testing Scheduler Type Detection & MCP Integration:")
+
+    # Import the MCP processor to test integration
+    from src.ai.mcp_processor import MCPAIProcessor
+
+    mcp_processor = MCPAIProcessor()
+
     test_phrases = [
         "set alarm after 20 seconds",
         "remind me every hour",
@@ -83,8 +89,29 @@ def test_scheduler():
     ]
 
     for phrase in test_phrases:
+        # Test scheduler type detection
         scheduler_type = scheduler._detect_scheduler_type(phrase.lower())
-        print(f"   '{phrase}' -> {scheduler_type}")
+
+        # Test MCP intent detection
+        result = mcp_processor.process_query(phrase)
+        intent = result["intent"].value
+        context = result["context"]
+        mcp_scheduler_type = context.get("scheduler_type", "unknown")
+
+        print(f"   '{phrase}'")
+        print(f"     → Scheduler Type: {scheduler_type}")
+        print(f"     → MCP Intent: {intent}")
+        print(f"     → MCP Scheduler Type: {mcp_scheduler_type}")
+        print(f"     → Match: {'✅' if scheduler_type == mcp_scheduler_type else '❌'}")
+
+        # Show snippet of MCP prompt to verify context hints
+        mcp_prompt = result["mcp_prompt"]
+        if "→ This is a" in mcp_prompt:
+            hint_line = [
+                line for line in mcp_prompt.split("\n") if "→ This is a" in line
+            ][0]
+            print(f"     → Hint: {hint_line}")
+        print()
 
     print("\n" + "=" * 50)
     print("✅ Task Scheduler Test Complete!")

@@ -41,15 +41,13 @@ class TaskScheduler:
         self.tasks: Dict[str, ScheduledTask] = {}
         self.time_patterns = {
             "seconds": [
-                r"(\d+)\s*(?:second|sec|s)",
-                r"after\s+(\d+)\s*(?:second|sec|s)",
+                r"(?:after|in)\s+(\d+)\s*(?:second|sec|s)",
             ],
             "minutes": [
-                r"(\d+)\s*(?:minute|min|m)",
-                r"after\s+(\d+)\s*(?:minute|min|m)",
+                r"(?:after|in)\s+(\d+)\s*(?:minute|min|m)",
             ],
-            "hours": [r"(\d+)\s*(?:hour|hr|h)", r"after\s+(\d+)\s*(?:hour|hr|h)"],
-            "days": [r"(\d+)\s*(?:day|d)", r"after\s+(\d+)\s*(?:day|d)"],
+            "hours": [r"(?:after|in)\s+(\d+)\s*(?:hour|hr|h)"],
+            "days": [r"(?:after|in)\s+(\d+)\s*(?:day|d)"],
         }
 
         self.recurring_patterns = [

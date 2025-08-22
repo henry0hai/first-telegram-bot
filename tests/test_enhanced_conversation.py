@@ -5,9 +5,11 @@ Test the enhanced conversation system with comprehensive Qdrant storage
 
 import asyncio
 import uuid
+import pytest
 from datetime import datetime, timezone
 
 
+@pytest.mark.asyncio
 async def test_enhanced_conversation():
     """Test enhanced conversation storage and MCP server compatibility"""
     from config.config import get_logger

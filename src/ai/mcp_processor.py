@@ -3,7 +3,11 @@ import re
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
 from src.utils.logging_utils import get_logger
-from src.ai.mcp_instructions import get_mcp_instructions, get_intent_guidance
+from src.ai.mcp_instructions import (
+    get_mcp_instructions,
+    get_intent_guidance,
+    get_intent_specific_instructions,
+)
 
 logger = get_logger(__name__)
 
@@ -309,10 +313,17 @@ class MCPAIProcessor:
     def _detect_scheduler_type(self, text_lower: str) -> str:
         """Detect the type of scheduler request"""
         # Use word boundaries and concrete patterns to avoid false positives like "every" in "everyone"
-        # Cancel/list operations first
+        # Cancel operations first
         if re.search(r"\b(cancel|remove|delete|stop)\b", text_lower):
             return "cancel"
-        if re.search(r"\b(list|show)\b|\bmy\s+tasks\b|\btasks\b", text_lower):
+        # Only match 'list tasks', 'my tasks', or 'show my tasks' for list
+        if (
+            re.search(r"\blist (my )?tasks\b", text_lower)
+            or re.search(r"\bshow (me )?my tasks\b", text_lower)
+            or re.search(r"\bmy tasks\b", text_lower)
+            or re.search(r"\bget (my )?tasks\b", text_lower)
+            or re.search(r"\blist tasks\b", text_lower)
+        ):
             return "list"
 
         # Recurring reminder (e.g., "every 25 minutes", "remind me every hour")
@@ -571,20 +582,24 @@ class MCPAIProcessor:
     ) -> str:
         """
         Prepare a structured prompt for the MCP AI based on detected intent
+        Returns only instructions relevant to the specific intent
         """
-        # Get base instructions from external file
-        base_prompt = get_mcp_instructions()
+        # Get intent-specific instructions (only relevant tools)
+        intent_instructions = get_intent_specific_instructions(intent.value)
 
-        # Get intent-specific guidance
-        location_hint = ""
+        # Add context-specific hints
+        context_hint = ""
+
+        # Add location hint for weather queries if available
         if intent == IntentType.WEATHER and context.get("location"):
-            location_hint = f" (Location detected: {context.get('location')})"
+            context_hint = f" (Location detected: {context.get('location')})"
+            intent_instructions = intent_instructions.replace(
+                "[location name]", context.get("location")
+            )
 
-        guidance = get_intent_guidance(intent.value, location_hint=location_hint)
+        user_query = f"\n** USER QUERY **\n{original_query}{context_hint}\n"
 
-        user_query = f"\n** USER QUERY **\n{original_query}\n"
-
-        return base_prompt + guidance + user_query
+        return intent_instructions + user_query
 
     def process_query(self, text: str) -> Dict:
         """

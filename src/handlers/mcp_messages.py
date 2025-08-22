@@ -14,6 +14,8 @@ from src.services.conversation_processor import conversation_processor
 from src.services.qdrant_conversation_manager import qdrant_conversation_manager
 from src.utils.logging_utils import get_logger
 
+
+CONFIDENCE_CONTEXT_THRESHOLD = 0.6  # Threshold for using conversation context
 logger = get_logger(__name__)
 
 
@@ -41,9 +43,39 @@ async def handle_mcp_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         relevant_topics = conversation_context_data.get("relevant_topics", [])
         confidence_score = conversation_context_data.get("confidence_score", 0.0)
 
-        # Enhanced user input with conversation context (only if confidence is high enough)
+        # Detect if this is a direct scheduler command (skip context enhancement for these)
+        direct_scheduler = any(
+            kw in user_input.lower()
+            for kw in [
+                "alarm",
+                "remind",
+                "reminder",
+                "schedule",
+                "notify",
+                "notification",
+                "alert",
+                "timer",
+                "after",
+                "every",
+                "recurring",
+                "repeat",
+                "set",
+                "cancel task",
+                "list tasks",
+                "my tasks",
+                "wake me",
+                "stand up",
+                "take water",
+                "break",
+                "meeting",
+                "appointment",
+                "deadline",
+            ]
+        )
+
+        # Only enhance input if not a direct scheduler command
         enhanced_input = user_input
-        if conversation_context and confidence_score > 0.3:
+        if conversation_context and confidence_score > CONFIDENCE_CONTEXT_THRESHOLD and not direct_scheduler:
             enhanced_input = (
                 f"{conversation_context}\n### Current Message:\n{user_input}"
             )
@@ -75,7 +107,7 @@ async def handle_mcp_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if (
                 mcp_result["intent"] == IntentType.TASK_SCHEDULER
                 and follow_up
-                and confidence_score > 0.3
+                and confidence_score > CONFIDENCE_CONTEXT_THRESHOLD
             ):
                 logger.info(
                     "Overriding scheduler intent to RAG due to follow-up phrase and strong context"
@@ -221,7 +253,7 @@ async def handle_mcp_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             bot_response=webhook_response,
                             intent=mcp_result["intent"].value,
                             context_used=bool(
-                                conversation_context and confidence_score > 0.3
+                                conversation_context and confidence_score > CONFIDENCE_CONTEXT_THRESHOLD
                             ),
                             conversation_turn=conversation_context_data.get(
                                 "messages_count", 0
@@ -246,7 +278,7 @@ async def handle_mcp_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     user_message=user_input,
                     bot_response=f"Webhook error: {str(e)}",
                     intent=mcp_result["intent"].value,
-                    context_used=bool(conversation_context and confidence_score > 0.3),
+                    context_used=bool(conversation_context and confidence_score > CONFIDENCE_CONTEXT_THRESHOLD),
                     conversation_turn=conversation_context_data.get(
                         "messages_count", 0
                     ),
@@ -270,7 +302,7 @@ async def handle_mcp_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         # Add conversation context info to feedback if relevant
-        if conversation_context and confidence_score > 0.3:
+        if conversation_context and confidence_score > CONFIDENCE_CONTEXT_THRESHOLD:
             msg_count = conversation_context_data.get("messages_count", 0)
             feedback_message += f"\n\n📚 *Using context from {msg_count} previous messages (confidence: {confidence_score:.1f})*"
 
