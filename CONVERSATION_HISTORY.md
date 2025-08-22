@@ -28,9 +28,9 @@ The Conversation History System provides intelligent conversation management wit
 │   Telegram Bot  │────│  Message Handler │────│ Conversation    │
 │                 │    │                  │    │ History Service │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
-                                                         │
-                              ┌──────────────────────────┼──────────────────────────┐
-                              │                          │                          │
+                                                        │
+                              ┌─────────────────────────┼─────────────────────────┐
+                              │                         │                         │
                     ┌─────────▼─────────┐    ┌──────────▼──────────┐    ┌─────────▼─────────┐
                     │   Redis Cache     │    │   Qdrant Vector     │    │ Conversation      │
                     │ (Recent Messages) │    │   Database (RAG)    │    │ Processor         │

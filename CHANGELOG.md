@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.0.0] (2025-08-22)
+
+## Major Features
+- Added Redis caching and Qdrant vector database integration to handle conversation history for the Telegram bot.
+- Automatically sends relevant conversation history as context if related to the user query.
+- Applied Retrieval-Augmented Generation (RAG) to search and retrieve relevant conversation history for improved long-term memory and semantic context.
+
+### Enhancements
+- Improved context handling and relevance scoring for user queries.
+- Optimized Redis caching strategy for faster message retrieval.
+- Enhanced Qdrant integration for better semantic search capabilities.
+
+### Architecture & Code Quality
+- Improved modularity and separation of concerns in the codebase.
+- Enhanced testing coverage and introduced new unit tests for critical components.
+- Refactored code for better readability and maintainability.
+
 ## [1.5.0] - 2025-08-20
 
 ### Major Features
