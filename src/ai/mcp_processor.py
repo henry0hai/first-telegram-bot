@@ -452,6 +452,7 @@ class MCPAIProcessor:
             intent = top_intents[0]
 
         # Extract additional context based on intent
+        # Add available MCP tools for each intent
         if intent == IntentType.WEATHER:
             location = self.extract_location(text)
             context = {
@@ -460,6 +461,7 @@ class MCPAIProcessor:
                 "extracted_keywords": [
                     kw for kw in self.weather_keywords if kw in text_lower
                 ],
+                "mcp_tools": [{"tool": "get_weather", "parameters": ["location"]}],
             }
         elif intent == IntentType.SYSTEM_INFO:
             context = {
@@ -467,6 +469,7 @@ class MCPAIProcessor:
                 "extracted_keywords": [
                     kw for kw in self.system_keywords if kw in text_lower
                 ],
+                "mcp_tools": [{"tool": "system_info", "parameters": []}],
             }
         elif intent == IntentType.DYNAMIC_TOOL:
             context = {
@@ -475,6 +478,17 @@ class MCPAIProcessor:
                     kw for kw in self.dynamic_tool_keywords if kw in text_lower
                 ],
                 "tool_type": self._detect_tool_type(text_lower),
+                "mcp_tools": [
+                    {
+                        "tool": "generic_tool_creation",
+                        "parameters": [
+                            "user_request",
+                            "preferred_language",
+                            "send_to_telegram",
+                            "chat_id",
+                        ],
+                    }
+                ],
             }
         elif intent == IntentType.SEARCH_QUERY:
             context = {
@@ -483,12 +497,21 @@ class MCPAIProcessor:
                 "extracted_keywords": [
                     kw for kw in self.search_keywords if kw in text_lower
                 ],
+                "mcp_tools": [{"tool": "search_google", "parameters": ["query"]}],
             }
         elif intent == IntentType.BUDGET_FINANCE:
             context = {
                 "query": text,
                 "extracted_keywords": [
                     kw for kw in self.budget_keywords if kw in text_lower
+                ],
+                "mcp_tools": [
+                    {"tool": "get_budget_summary", "parameters": []},
+                    {
+                        "tool": "add_expense",
+                        "parameters": ["amount", "category", "note"],
+                    },
+                    {"tool": "add_income", "parameters": ["amount", "source", "note"]},
                 ],
             }
         elif intent == IntentType.EMAIL_COMMUNICATION:
@@ -497,12 +520,24 @@ class MCPAIProcessor:
                 "extracted_keywords": [
                     kw for kw in self.email_keywords if kw in text_lower
                 ],
+                "mcp_tools": [
+                    {
+                        "tool": "send_email",
+                        "parameters": ["to", "subject", "body", "attachments"],
+                    }
+                ],
             }
         elif intent == IntentType.TRANSLATION_LANGUAGE:
             context = {
                 "query": text,
                 "extracted_keywords": [
                     kw for kw in self.translation_keywords if kw in text_lower
+                ],
+                "mcp_tools": [
+                    {
+                        "tool": "translate_text",
+                        "parameters": ["text", "target_language"],
+                    }
                 ],
             }
         elif intent == IntentType.TASK_SCHEDULER:
@@ -512,12 +547,20 @@ class MCPAIProcessor:
                     kw for kw in self.scheduler_keywords if kw in text_lower
                 ],
                 "scheduler_type": scheduler_type,
+                "mcp_tools": [
+                    {"tool": "create_alarm", "parameters": ["time", "message"]},
+                    {"tool": "create_reminder", "parameters": ["interval", "message"]},
+                    {"tool": "list_tasks", "parameters": []},
+                ],
             }
-        else:  # RAG_QUERY
+        else:  # RAG_QUERY or fallback
             context = {
                 "query": text,
                 "extracted_keywords": [
                     kw for kw in self.rag_keywords if kw in text_lower
+                ],
+                "mcp_tools": [
+                    {"tool": "rag_query", "parameters": ["query", "document_id"]}
                 ],
             }
 
