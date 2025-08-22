@@ -1,8 +1,23 @@
 # Telegram System Monitor Bot
 
-An advanced, modular Telegram bot built with Python for system monitoring (CPU, RAM, disk usage), weather updates, and administrative controls. Now featuring AI-powered natural language understanding, intent detection, and integration with Model Context Protocol (MCP) for intelligent responses and workflow automation. The bot uses the `python-telegram-bot` library, robust locking for safe multi-user interactions, scheduled tasks, and supports both classic and MCP-enhanced operation modes. Easily extensible with a scalable architecture, N8N webhook integration, and future-ready for additional AI, database, and microservice features.
+An advanced, modular Telegram bot built with Python for system monitoring (CPU, RAM, disk usage), weather updates, and administrative controls. Now featuring **AI-powered conversation history**, **RAG-enhanced context**, **Redis caching**, and **Qdrant vector database** integration alongside existing AI-powered natural language understanding, intent detection, and Model Context Protocol (MCP) support for intelligent responses and workflow automation. The bot uses the `python-telegram-bot` library, robust locking for safe multi-user interactions, scheduled tasks, and supports both classic and MCP-enhanced operation modes with **persistent conversation memory**. Easily extensible with a scalable architecture, N8N webhook integration, and future-ready for additional AI, database, and microservice features.
 
-**Noted**: Just added the feature using simple AI model make it more useful.
+## ✨ Key Features
+
+### 🧠 **NEW: Conversation History & Memory**
+- **Redis-based caching** for fast recent conversation retrieval
+- **Qdrant RAG integration** for intelligent long-term memory
+- **Semantic search** through conversation history using sentence transformers
+- **Smart context filtering** - only includes relevant previous messages
+- **Conversation clearing** via commands or natural language ("clear all conversation")
+- **Pattern detection** and conversation analytics
+- **Chunked storage** for memory-efficient processing
+
+### 🤖 **AI & Intelligence**
+- MCP-enhanced natural language understanding
+- Intent detection and context-aware responses
+- Dynamic tool creation and execution
+- N8N webhook integration for complex workflows
 
 ## Project Structure
 
@@ -91,6 +106,7 @@ first-telegram-bot/
 
 ## Features
 
+### 📱 **Core Commands**
 - `/start`: Starts or restarts bot activities and greets the user.
 - `/help`: Displays a list of available commands.
 - `/say <message>`: Echoes back the user's message.
@@ -102,9 +118,25 @@ first-telegram-bot/
 - `/weather <city>`: Fetches current weather for a specified city using OpenWeatherMap.
 - `/uptime`: Shows how long the bot has been running.
 - `/stop`: Stops all scheduled activities (admin only).
-- __Scheduled Tasks__: Automatically sends weather updates and debug messages at configurable intervals.
 
-> With AI model, now can directly command using: `info` or `weather in London`, `uptime` directly without `/` for some command
+### 💬 **NEW: Conversation Commands**
+- `/clear_conversation`: Clear all conversation history for smart reset
+- `/conversation_status`: View conversation statistics and history summary
+- **Natural Language Clearing**: Say "clear all conversation", "forget everything", or "start fresh"
+
+### 🕒 **Scheduler Commands**  
+- `/schedule`: Show scheduler usage help and examples
+- `/tasks`: List all your scheduled tasks
+- `/cancel <task_id>`: Cancel a specific scheduled task
+
+### 🤖 **AI Features**
+- **Natural Language Commands**: Use `info`, `weather in London`, `uptime` directly without `/`
+- **Smart Context**: Bot remembers previous conversations for better responses
+- **Intent Detection**: Automatically understands what you want to do
+- **RAG Memory**: Long-term conversation storage with semantic search
+
+### ⏰ **Scheduled Tasks**
+- Automatically sends weather updates and debug messages at configurable intervals.
 
 ## Prerequisites
 
@@ -147,6 +179,47 @@ pip install -r requirements.txt
 ```bash
 python run.py
 ```
+
+### 💬 **NEW: Conversation History Setup**
+
+To enable the conversation history features:
+
+1. **Install Additional Dependencies** (already included in requirements.txt):
+```bash
+pip install redis==5.0.1 qdrant-client==1.9.1 sentence-transformers==2.7.0 numpy==1.26.4
+```
+
+2. **Set up Redis** (for fast conversation caching):
+```bash
+# Using Docker (recommended)
+docker run -d --name redis -p 6379:6379 redis:7-alpine
+
+# Or install locally on macOS
+brew install redis && redis-server
+```
+
+3. **Set up Qdrant** (for RAG and long-term memory):
+```bash
+# Using Docker (recommended) 
+docker run -d --name qdrant -p 6333:6333 -v qdrant_storage:/qdrant/storage qdrant/qdrant
+```
+
+4. **Update .env file**:
+```bash
+# Add these to your .env file
+REDIS_URL="redis://localhost:6379"
+QDRANT_API_URL="http://localhost:6333"
+QDRANT_API_KEY=""  # Optional, for Qdrant Cloud
+```
+
+5. **Verify Setup**:
+```bash
+python setup_conversation_history.py  # Check configuration
+python test_conversation_history.py   # Run comprehensive tests
+python demo_conversation_history.py   # See how it works
+```
+
+📚 **Full Documentation**: See [CONVERSATION_HISTORY.md](CONVERSATION_HISTORY.md) for detailed setup and usage.
 
 ## 🔄 Running the Application
 

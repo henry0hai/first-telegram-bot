@@ -1,6 +1,8 @@
 # src/core/mcp_bot.py - MCP-enhanced bot application
 import time
 import fcntl
+import asyncio
+import signal
 
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
 from config.config import config
@@ -22,9 +24,15 @@ from src.handlers.scheduler_commands import (
     cancel_command,
     schedule_command,
 )
+from src.handlers.conversation_commands import (
+    clear_conversation_command,
+    conversation_status_command,
+)
 from src.handlers.messages import handle_photo, handle_document
 from src.handlers.mcp_messages import handle_mcp_text
 from src.services.scheduler import on_startup, scheduled_weather, debug_time
+from src.services.conversation_history import conversation_service
+from src.services.qdrant_conversation_manager import qdrant_conversation_manager
 from src.utils.lock import ensure_single_instance
 from src.utils.logging_utils import get_logger
 
@@ -35,8 +43,12 @@ def error_handler(update, context):
     logger.error(f"Error occurred: {context.error}")
 
 
-def main():
+async def main():
     # Avoid modifying globals directly; use local variables and update config explicitly if needed
+    # Prevent tokenizers from spawning extra processes/threads that may leak semaphores
+    import os
+
+    os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
     lock_file = ensure_single_instance()
     start_time = time.time()  # Local start time for this instance
     application = ApplicationBuilder().token(config.telegram_bot_token).build()
@@ -50,6 +62,19 @@ def main():
     logger.info(
         f"MCP Bot initialized with config.is_bot_running: {config.is_bot_running}"
     )
+
+    # Initialize conversation services
+    try:
+        # Initialize basic conversation service
+        await conversation_service.initialize()
+        logger.info("Conversation history service initialized successfully")
+
+        # Initialize enhanced Qdrant conversation manager
+        await qdrant_conversation_manager.initialize()
+        logger.info("Enhanced Qdrant conversation manager initialized successfully")
+
+    except Exception as e:
+        logger.error(f"Failed to initialize conversation services: {e}")
 
     # Add command handlers
     application.add_handler(CommandHandler("start", start))
@@ -69,6 +94,14 @@ def main():
     application.add_handler(CommandHandler("cancel", cancel_command))
     application.add_handler(CommandHandler("schedule", schedule_command))
 
+    # Conversation management command handlers
+    application.add_handler(
+        CommandHandler("clear_conversation", clear_conversation_command)
+    )
+    application.add_handler(
+        CommandHandler("conversation_status", conversation_status_command)
+    )
+
     application.add_error_handler(error_handler)
 
     # MCP-enhanced message handlers
@@ -86,16 +119,41 @@ def main():
     job_queue.run_repeating(debug_time, interval=config.debug_time_loop, first=0)
 
     print("MCP Bot is running... Press Ctrl+C to stop")
+    stop_event = asyncio.Event()
+
+    # Setup signal handlers to stop gracefully
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            loop.add_signal_handler(sig, stop_event.set)
+        except NotImplementedError:
+            # Fallback in environments without signal support
+            pass
+
     try:
-        application.run_polling()
-    except KeyboardInterrupt:
-        logger.info("MCP Bot stopped by user (Ctrl+C)")
-        application.stop()
-        application.shutdown()
+        # Explicit async lifecycle
+        await application.initialize()
+        await application.start()
+        await application.updater.start_polling(drop_pending_updates=True)
+        await stop_event.wait()
     except Exception as e:
         logger.error(f"MCP Bot stopped unexpectedly: {e}")
     finally:
-        # Shut down the application synchronously
+        # Clean shutdown
+        logger.info("Bot shutting down...")
+        try:
+            config.is_bot_running = False
+            # Stop polling before stopping the app to avoid in-flight network errors
+            try:
+                if application.updater:
+                    await application.updater.stop()
+            except Exception:
+                pass
+            await application.stop()
+            await application.shutdown()
+        except Exception as e:
+            logger.debug(f"Shutdown cleanup error: {e}")
+        # Release lock
         if lock_file:
             fcntl.flock(lock_file, fcntl.LOCK_UN)  # Unlock the file
             lock_file.close()
@@ -103,4 +161,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

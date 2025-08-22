@@ -112,11 +112,19 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         /tasks - List your scheduled tasks
         /cancel <task_id> - Cancel a specific task
         
-        💡 **Natural Language Scheduling:**
-        You can also create tasks by typing naturally:
-        • "Set alarm after 20 seconds"
-        • "Remind me every 25 minutes to stand up"
-        • "Notify me next week at 9:00 AM"
+        � **Conversation Commands:**
+        /clear_conversation - Clear all conversation history
+        /conversation_status - Show conversation statistics
+        
+        💡 **Natural Language Features:**
+        • **Smart Scheduling:** "Set alarm after 20 seconds", "Remind me every 25 minutes"
+        • **Conversation Memory:** I remember our previous chats for better context
+        • **Clear History:** Say "clear all conversation" or "forget everything" to reset
+        
+        🤖 **AI Features:**
+        • Intelligent conversation context using previous messages
+        • Semantic search through conversation history
+        • RAG-enhanced responses with long-term memory
         """
         await update.message.reply_text(help_text)
 

@@ -34,3 +34,7 @@ urllib3==2.2.1
 yarl==1.18.3
 openai==1.100.1
 openapi==2.0.0
+redis==5.0.1
+qdrant-client==1.9.1
+sentence-transformers==2.7.0
+numpy==1.26.4
