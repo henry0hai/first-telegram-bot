@@ -182,19 +182,27 @@ class QdrantConversationManager:
         context_used: bool = False,
         session_id: Optional[str] = None,
         conversation_turn: int = 0,
+        message_id: Optional[str] = None,
     ) -> str:
         """
         Store conversation with comprehensive metadata for MCP server access
+
+        Args:
+            message_id: Optional UUID to use. If not provided, will generate one.
 
         Returns:
             str: The UUID of the stored conversation
         """
         try:
-            # Generate deterministic UUID
-            timestamp = datetime.now(timezone.utc)
-            content = f"{user_id}:{timestamp.isoformat()}"
-            namespace = uuid.uuid5(uuid.NAMESPACE_DNS, "conversation.bot.v2")
-            entry_id = str(uuid.uuid5(namespace, content))
+            # Use provided message_id or generate deterministic UUID
+            if message_id is None:
+                timestamp = datetime.now(timezone.utc)
+                content = f"{user_id}:{timestamp.isoformat()}"
+                namespace = uuid.uuid5(uuid.NAMESPACE_DNS, "conversation.bot.v2")
+                entry_id = str(uuid.uuid5(namespace, content))
+            else:
+                entry_id = message_id
+                timestamp = datetime.now(timezone.utc)
 
             # Create comprehensive conversation entry
             entry = QdrantConversationEntry(

@@ -14,8 +14,11 @@ from src.services.conversation_processor import conversation_processor
 from src.services.qdrant_conversation_manager import qdrant_conversation_manager
 from src.utils.logging_utils import get_logger
 
+from datetime import datetime, timezone
 
-CONFIDENCE_CONTEXT_THRESHOLD = 0.6  # Threshold for using conversation context
+timestamp = datetime.now(timezone.utc)
+
+CONFIDENCE_CONTEXT_THRESHOLD = 0.5  # Threshold for using conversation context
 logger = get_logger(__name__)
 
 
@@ -25,6 +28,8 @@ async def handle_mcp_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_input = update.message.text
     user_id = str(update.message.from_user.id)
     username = update.message.from_user.username or "Unknown"
+
+    message_id = conversation_service._get_message_id(user_id, timestamp)
 
     try:
         # Check if user wants to clear conversation history
@@ -75,7 +80,11 @@ async def handle_mcp_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Only enhance input if not a direct scheduler command
         enhanced_input = user_input
-        if conversation_context and confidence_score > CONFIDENCE_CONTEXT_THRESHOLD and not direct_scheduler:
+        if (
+            conversation_context
+            and confidence_score > CONFIDENCE_CONTEXT_THRESHOLD
+            and not direct_scheduler
+        ):
             enhanced_input = (
                 f"{conversation_context}\n### Current Message:\n{user_input}"
             )
@@ -105,7 +114,7 @@ async def handle_mcp_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ]
             )
             if (
-                mcp_result["intent"] == IntentType.TASK_SCHEDULER
+                mcp_result["intent"] == IntentType.RAG_QUERY
                 and follow_up
                 and confidence_score > CONFIDENCE_CONTEXT_THRESHOLD
             ):
@@ -134,14 +143,6 @@ async def handle_mcp_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Handle scheduler requests directly (no webhook needed for local scheduling)
         if mcp_result["intent"] == IntentType.TASK_SCHEDULER:
             await handle_scheduler_command(update, context, mcp_result["context"])
-            # Store conversation for scheduler commands too
-            await conversation_service.add_conversation(
-                user_id=user_id,
-                username=username,
-                user_message=user_input,
-                bot_response="Scheduler command processed",
-                intent=mcp_result["intent"].value,
-            )
             return  # Exit early for scheduler commands
 
         # Handle dynamic tool requests with preprocessing (user already got feedback)
@@ -218,6 +219,13 @@ async def handle_mcp_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         f"MCP enhanced keys: {list(payload['message']['mcp_enhanced'].keys())}"
                     )
 
+                # Handle to prepare payload include REDIS here
+                redis_payload = {
+                    "user_id": user_id,
+                    "message_id": message_id,
+                }
+                payload["redis"] = redis_payload
+
                 async with aiohttp.ClientSession() as session:
                     async with session.post(webhook_url, json=payload) as resp:
                         webhook_response = ""
@@ -243,6 +251,7 @@ async def handle_mcp_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             user_message=user_input,
                             bot_response=webhook_response,
                             intent=mcp_result["intent"].value,
+                            message_id=message_id,
                         )
 
                         # ENHANCED: Also store in comprehensive Qdrant for MCP server access
@@ -253,11 +262,17 @@ async def handle_mcp_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             bot_response=webhook_response,
                             intent=mcp_result["intent"].value,
                             context_used=bool(
-                                conversation_context and confidence_score > CONFIDENCE_CONTEXT_THRESHOLD
+                                conversation_context
+                                and confidence_score > CONFIDENCE_CONTEXT_THRESHOLD
                             ),
                             conversation_turn=conversation_context_data.get(
                                 "messages_count", 0
                             ),
+                            message_id=message_id,
+                        )
+
+                        logger.info(
+                            f"Caching conversation for {user_id} with message ID {message_id} successful."
                         )
 
             except Exception as e:
@@ -269,6 +284,7 @@ async def handle_mcp_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     user_message=user_input,
                     bot_response=f"Webhook error: {str(e)}",
                     intent=mcp_result["intent"].value,
+                    message_id=message_id,
                 )
 
                 # ENHANCED: Also store in comprehensive Qdrant for MCP server access
@@ -278,10 +294,14 @@ async def handle_mcp_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     user_message=user_input,
                     bot_response=f"Webhook error: {str(e)}",
                     intent=mcp_result["intent"].value,
-                    context_used=bool(conversation_context and confidence_score > CONFIDENCE_CONTEXT_THRESHOLD),
+                    context_used=bool(
+                        conversation_context
+                        and confidence_score > CONFIDENCE_CONTEXT_THRESHOLD
+                    ),
                     conversation_turn=conversation_context_data.get(
                         "messages_count", 0
                     ),
+                    message_id=message_id,
                 )
 
         # Provide user feedback for other intents (DYNAMIC_TOOL already got immediate feedback)

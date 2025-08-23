@@ -3,27 +3,7 @@
 Conversation History Service with Redis Caching and RAG Integration
 
 This service provides:
-1. Redis-bas            message = ConversationMessage(
-                user_id=user_id,
-                username=username,
-                message=user_message,
-                response=bot_response,
-                timestamp=datetime.now(timezone.utc),
-              for result in search_results:
-                payload = result.payload
-                if payload.get('timestamp') not in exclude_recent_ids:
-                    try:
-                        # Remove combined_text before creating ConversationMessage
-                        payload_copy = payload.copy()
-                        payload_copy.pop('combined_text', None)  # Remove if exists
-
-                        message = ConversationMessage.from_dict(payload_copy)
-                        message.context_score = result.score
-                        messages.append(message)
-                    except Exception as e:
-                        logger.warning(f"Failed to parse Qdrant result: {e}")
-                        continue    intent=intent
-            )rsation caching for fast recent history retrieval
+1. Redis-based conversation caching for fast recent history retrieval
 2. Intelligent conversation context filtering
 3. RAG integration with Qdrant for long-term storage and retrieval
 4. Chunked conversation storage for memory efficiency
@@ -150,8 +130,8 @@ class ConversationHistoryService:
             logger.error(f"Failed to ensure Qdrant collection: {e}")
 
     def _get_redis_key(self, user_id: str) -> str:
-        """Get Redis key for user conversation history"""
-        return f"conversation:user:{user_id}"
+        """Get Redis hash key for user conversation history"""
+        return f"conversation_history:user:{user_id}"
 
     def _get_message_id(self, user_id: str, timestamp: datetime) -> str:
         """Generate unique message ID as UUID"""
@@ -167,51 +147,71 @@ class ConversationHistoryService:
         user_message: str,
         bot_response: str,
         intent: Optional[str] = None,
+        message_id: Optional[str] = None,
     ):
         """Add a new conversation to both Redis cache and Qdrant"""
         try:
+            timestamp = datetime.now(timezone.utc)
+            if message_id is None:
+                message_id = self._get_message_id(user_id, timestamp)
+
             message = ConversationMessage(
                 user_id=user_id,
                 username=username,
                 message=user_message,
                 response=bot_response,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=timestamp,
                 intent=intent,
             )
 
             # Store in Redis for fast recent access
-            await self._store_in_redis(message)
+            await self._store_in_redis(message, message_id)
 
             # Store in Qdrant for long-term RAG retrieval
-            await self._store_in_qdrant(message)
+            await self._store_in_qdrant(message, message_id)
 
             logger.info(f"Stored conversation for user {username}")
 
         except Exception as e:
             logger.error(f"Failed to add conversation: {e}")
 
-    async def _store_in_redis(self, message: ConversationMessage):
-        """Store message in Redis with TTL"""
+    async def _store_in_redis(self, message: ConversationMessage, message_id: str):
+        """Store message in Redis hash with TTL"""
         if not self.redis_client:
+            logger.warning("Redis client is not initialized!")
             return
 
         try:
             redis_key = self._get_redis_key(message.user_id)
             message_data = json.dumps(message.to_dict(), default=str)
+            logger.info(f"[DEBUG] Redis URL: {self.redis_url}")
+            logger.info(
+                f"[DEBUG] Storing to Redis hash: {redis_key} field: {message_id}"
+            )
+            logger.info(f"[DEBUG] Message data: {message_data}")
 
-            # Use Redis list to store messages chronologically
-            await self.redis_client.lpush(redis_key, message_data)
-
-            # Trim to keep only recent messages
-            await self.redis_client.ltrim(redis_key, 0, self.max_redis_messages - 1)
-
-            # Set TTL
+            # Store in Redis hash
+            await self.redis_client.hset(redis_key, message_id, message_data)
+            # Set TTL on the hash key
             await self.redis_client.expire(redis_key, self.redis_ttl)
+            logger.info(f"[DEBUG] Set TTL {self.redis_ttl} on key {redis_key}")
+
+            # Optionally trim old messages (if hash grows too large)
+            fields = await self.redis_client.hkeys(redis_key)
+            if len(fields) > self.max_redis_messages:
+                # Sort by timestamp in value, remove oldest
+                all_msgs = await self.redis_client.hgetall(redis_key)
+                # Parse and sort by timestamp
+                sorted_fields = sorted(
+                    all_msgs.items(), key=lambda item: json.loads(item[1])["timestamp"]
+                )
+                for field, _ in sorted_fields[: -self.max_redis_messages]:
+                    await self.redis_client.hdel(redis_key, field)
 
         except Exception as e:
             logger.error(f"Failed to store in Redis: {e}")
 
-    async def _store_in_qdrant(self, message: ConversationMessage):
+    async def _store_in_qdrant(self, message: ConversationMessage, message_id: str):
         """Store message in Qdrant for semantic search"""
         if not self.qdrant_client or not self.embedding_model:
             return
@@ -228,8 +228,7 @@ class ConversationHistoryService:
                 )
             )
 
-            # Create point for Qdrant
-            point_id = self._get_message_id(message.user_id, message.timestamp)
+            # Use the provided message_id for Qdrant point ID
             payload = message.to_dict()
             payload["combined_text"] = combined_text
 
@@ -238,7 +237,7 @@ class ConversationHistoryService:
                 collection_name=self.collection_name,
                 points=[
                     models.PointStruct(
-                        id=point_id, vector=embedding.tolist(), payload=payload
+                        id=message_id, vector=embedding.tolist(), payload=payload
                     )
                 ],
             )
@@ -305,26 +304,27 @@ class ConversationHistoryService:
     async def _get_recent_from_redis(
         self, user_id: str, limit: int = 20
     ) -> List[ConversationMessage]:
-        """Get recent messages from Redis cache"""
+        """Get recent messages from Redis hash cache, sorted by timestamp desc"""
         if not self.redis_client:
             return []
 
         try:
             redis_key = self._get_redis_key(user_id)
-            messages_data = await self.redis_client.lrange(redis_key, 0, limit - 1)
-
-            messages = []
-            for data in messages_data:
+            all_msgs = await self.redis_client.hgetall(redis_key)
+            # all_msgs: dict of {message_id: json_str}
+            parsed_msgs = []
+            for msg_json in all_msgs.values():
                 try:
                     message_dict = json.loads(
-                        data.decode() if isinstance(data, bytes) else data
+                        msg_json.decode() if isinstance(msg_json, bytes) else msg_json
                     )
-                    messages.append(ConversationMessage.from_dict(message_dict))
+                    parsed_msgs.append(ConversationMessage.from_dict(message_dict))
                 except Exception as e:
                     logger.warning(f"Failed to parse message from Redis: {e}")
                     continue
-
-            return messages
+            # Sort by timestamp descending (most recent first)
+            parsed_msgs.sort(key=lambda m: m.timestamp, reverse=True)
+            return parsed_msgs[:limit]
 
         except Exception as e:
             logger.error(f"Failed to get recent messages from Redis: {e}")
