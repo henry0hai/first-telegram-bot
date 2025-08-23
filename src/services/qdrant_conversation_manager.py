@@ -37,7 +37,7 @@ class QdrantConversationEntry:
     user_id: str
     username: str
     user_message: str
-    bot_response: str
+    response: str
     timestamp: str  # ISO format for consistency
     timestamp_unix: float = 0.0  # Unix timestamp for numeric filtering
 
@@ -177,7 +177,7 @@ class QdrantConversationManager:
         user_id: str,
         username: str,
         user_message: str,
-        bot_response: str,
+        response: str,
         intent: Optional[str] = None,
         context_used: bool = False,
         session_id: Optional[str] = None,
@@ -210,14 +210,14 @@ class QdrantConversationManager:
                 user_id=user_id,
                 username=username,
                 user_message=user_message,
-                bot_response=bot_response,
+                response=response,
                 timestamp=timestamp.isoformat(),
                 timestamp_unix=timestamp.timestamp(),  # Add Unix timestamp for filtering
                 intent=intent,
                 message_length=len(user_message),
-                response_length=len(bot_response),
+                response_length=len(response),
                 conversation_turn=conversation_turn,
-                combined_text=f"User: {user_message}\nBot: {bot_response}",
+                combined_text=f"User: {user_message}\nBot: {response}",
                 session_id=session_id
                 or f"session_{user_id}_{timestamp.strftime('%Y%m%d')}",
                 is_multi_turn=conversation_turn > 0,
@@ -228,7 +228,7 @@ class QdrantConversationManager:
             )
 
             # Extract topics for better searchability
-            entry.topics = self._extract_topics(user_message, bot_response, intent)
+            entry.topics = self._extract_topics(user_message, response, intent)
 
             # Generate embedding
             if self.embedding_model:
@@ -267,7 +267,7 @@ class QdrantConversationManager:
             return ""
 
     def _extract_topics(
-        self, user_message: str, bot_response: str, intent: Optional[str]
+        self, user_message: str, response: str, intent: Optional[str]
     ) -> List[str]:
         """Extract topics from conversation for better MCP server queries"""
         topics = []
@@ -279,7 +279,7 @@ class QdrantConversationManager:
         # Simple keyword extraction (can be enhanced with NLP)
         import re
 
-        text = f"{user_message} {bot_response}".lower()
+        text = f"{user_message} {response}".lower()
 
         # Common topic patterns
         topic_patterns = {
@@ -646,7 +646,7 @@ class QdrantConversationManager:
                         user_id=legacy_payload.get("user_id", ""),
                         username=legacy_payload.get("username", ""),
                         user_message=legacy_payload.get("message", ""),
-                        bot_response=legacy_payload.get("response", ""),
+                        response=legacy_payload.get("response", ""),
                         timestamp=legacy_payload.get("timestamp", ""),
                         intent=legacy_payload.get("intent"),
                         combined_text=legacy_payload.get("combined_text", ""),

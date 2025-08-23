@@ -35,6 +35,7 @@ async def update_conversation_response(req: UpdateConversationRequest):
 
     msg = json.loads(msg_json.decode() if isinstance(msg_json, bytes) else msg_json)
     msg["bot_response"] = req.response
+    msg["response"] = req.response
     # Save back to Redis
     await conversation_service.redis_client.hset(
         redis_key, req.message_id, json.dumps(msg)

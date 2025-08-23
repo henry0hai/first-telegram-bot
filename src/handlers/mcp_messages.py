@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 
 timestamp = datetime.now(timezone.utc)
 
-CONFIDENCE_CONTEXT_THRESHOLD = 0.5  # Threshold for using conversation context
+CONFIDENCE_CONTEXT_THRESHOLD = 0.3  # Threshold for using conversation context
 logger = get_logger(__name__)
 
 
@@ -259,7 +259,7 @@ async def handle_mcp_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             user_id=user_id,
                             username=username,
                             user_message=user_input,
-                            bot_response=webhook_response,
+                            response=webhook_response,
                             intent=mcp_result["intent"].value,
                             context_used=bool(
                                 conversation_context
@@ -292,7 +292,7 @@ async def handle_mcp_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     user_id=user_id,
                     username=username,
                     user_message=user_input,
-                    bot_response=f"Webhook error: {str(e)}",
+                    response=f"Webhook error: {str(e)}",
                     intent=mcp_result["intent"].value,
                     context_used=bool(
                         conversation_context
