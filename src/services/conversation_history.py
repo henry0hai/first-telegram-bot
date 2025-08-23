@@ -146,6 +146,7 @@ class ConversationHistoryService:
         username: str,
         user_message: str,
         bot_response: str,
+        response: str,
         intent: Optional[str] = None,
         message_id: Optional[str] = None,
     ):

@@ -83,7 +83,6 @@ async def handle_mcp_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if (
             conversation_context
             and confidence_score > CONFIDENCE_CONTEXT_THRESHOLD
-            and not direct_scheduler
         ):
             enhanced_input = (
                 f"{conversation_context}\n### Current Message:\n{user_input}"
