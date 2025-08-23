@@ -266,6 +266,72 @@ class QdrantConversationManager:
             logger.error(f"Failed to store enhanced conversation: {e}")
             return ""
 
+    async def update_conversation_response(self, message_id: str, new_response: str):
+        """Update the response field for an existing conversation in Qdrant"""
+        try:
+            if not self.qdrant_client:
+                logger.warning("Qdrant client not initialized")
+                return False
+
+            # First, retrieve the existing point to get current payload
+            search_result = await asyncio.to_thread(
+                self.qdrant_client.retrieve,
+                collection_name=self.collection_name,
+                ids=[message_id],
+                with_payload=True,
+                with_vectors=True,
+            )
+
+            if not search_result:
+                logger.warning(
+                    f"Conversation with message_id {message_id} not found in Qdrant"
+                )
+                return False
+
+            existing_point = search_result[0]
+            payload = existing_point.payload.copy()
+
+            # Update the response field
+            payload["response"] = new_response
+
+            # Update combined_text for consistency
+            payload["combined_text"] = (
+                f"User: {payload.get('user_message', '')}\nBot: {new_response}"
+            )
+
+            # Re-generate embedding with updated text if embedding model is available
+            vector = existing_point.vector
+            if self.embedding_model:
+                try:
+                    new_embedding = await asyncio.to_thread(
+                        lambda: self.embedding_model.encode(
+                            payload["combined_text"], show_progress_bar=False
+                        )
+                    )
+                    vector = new_embedding.tolist()
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to regenerate embedding, keeping original: {e}"
+                    )
+
+            # Update the point in Qdrant
+            await asyncio.to_thread(
+                self.qdrant_client.upsert,
+                collection_name=self.collection_name,
+                points=[
+                    models.PointStruct(id=message_id, vector=vector, payload=payload)
+                ],
+            )
+
+            logger.info(
+                f"Successfully updated conversation response for message_id: {message_id}"
+            )
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to update conversation response in Qdrant: {e}")
+            return False
+
     def _extract_topics(
         self, user_message: str, response: str, intent: Optional[str]
     ) -> List[str]:
