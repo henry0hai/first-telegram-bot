@@ -78,15 +78,18 @@ async def handle_mcp_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ]
         )
 
-        # Only enhance input if not a direct scheduler command
+        # Improved detection: context is only used if it's non-empty, confidence is above threshold, and not a direct scheduler command
+        context_used = False
         enhanced_input = user_input
         if (
             conversation_context
             and confidence_score > CONFIDENCE_CONTEXT_THRESHOLD
+            and not direct_scheduler
         ):
             enhanced_input = (
                 f"{conversation_context}\n### Current Message:\n{user_input}"
             )
+            context_used = True
             logger.info(
                 f"Enhanced context for {username}: {len(conversation_context)} chars, "
                 f"confidence: {confidence_score:.2f}, topics: {relevant_topics[:3]}"
@@ -170,9 +173,8 @@ async def handle_mcp_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "text": mcp_result.get(
                         "original_user_input", user_input
                     ),  # Use original input for webhook
-                    "enhanced_text": (
-                        enhanced_input if conversation_context else None
-                    ),  # Include enhanced version if context was added
+                    "enhanced_text": (enhanced_input if context_used else None),
+                    "context_used": context_used,
                     "conversation_context": {
                         "has_context": bool(conversation_context),
                         "context_messages_count": conversation_context_data.get(

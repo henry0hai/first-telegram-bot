@@ -49,8 +49,17 @@ class ConversationMessage:
 
     @classmethod
     def from_dict(cls, data: dict) -> "ConversationMessage":
-        """Create from dictionary"""
+        """Create from dictionary, handling both 'bot_response' and 'response' keys for backward compatibility"""
+        data = data.copy()
         data["timestamp"] = datetime.fromisoformat(data["timestamp"])
+        # Handle both 'bot_response' and 'response' keys
+        if "bot_response" in data:
+            data["response"] = data.pop("bot_response")
+        elif "response" not in data and "bot_respons" in data:
+            # Handle typo 'bot_respons' if present
+            data["response"] = data.pop("bot_respons")
+        elif "response" not in data:
+            data["response"] = ""
         return cls(**data)
 
 
@@ -146,7 +155,6 @@ class ConversationHistoryService:
         username: str,
         user_message: str,
         bot_response: str,
-        response: str,
         intent: Optional[str] = None,
         message_id: Optional[str] = None,
     ):
