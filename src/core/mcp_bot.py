@@ -33,6 +33,7 @@ from src.handlers.mcp_messages import handle_mcp_text
 from src.services.scheduler import on_startup, scheduled_weather, debug_time
 from src.services.conversation_history import conversation_service
 from src.services.qdrant_conversation_manager import qdrant_conversation_manager
+from src.services.initialization import are_services_initialized
 from src.utils.lock import ensure_single_instance
 from src.utils.logging_utils import get_logger
 
@@ -63,18 +64,23 @@ async def main():
         f"MCP Bot initialized with config.is_bot_running: {config.is_bot_running}"
     )
 
-    # Initialize conversation services
-    try:
-        # Initialize basic conversation service
-        await conversation_service.initialize()
-        logger.info("Conversation history service initialized successfully")
+    # Initialize conversation services only if not already initialized
+    if not are_services_initialized():
+        try:
+            # Initialize basic conversation service
+            await conversation_service.initialize()
+            logger.info("Conversation history service initialized successfully")
 
-        # Initialize enhanced Qdrant conversation manager
-        await qdrant_conversation_manager.initialize()
-        logger.info("Enhanced Qdrant conversation manager initialized successfully")
+            # Initialize enhanced Qdrant conversation manager
+            await qdrant_conversation_manager.initialize()
+            logger.info("Enhanced Qdrant conversation manager initialized successfully")
 
-    except Exception as e:
-        logger.error(f"Failed to initialize conversation services: {e}")
+        except Exception as e:
+            logger.error(f"Failed to initialize conversation services: {e}")
+    else:
+        logger.debug(
+            "Conversation services already initialized, skipping initialization"
+        )
 
     # Add command handlers
     application.add_handler(CommandHandler("start", start))

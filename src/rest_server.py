@@ -4,6 +4,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from src.services.conversation_history import conversation_service
 from src.services.qdrant_conversation_manager import qdrant_conversation_manager
+from src.services.initialization import are_services_initialized, initialize_services
 from src.utils.logging_utils import get_logger
 
 logger = get_logger(__name__)
@@ -11,8 +12,14 @@ logger = get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await conversation_service.initialize()
-    await qdrant_conversation_manager.initialize()
+    # Initialize services only if not already initialized
+    if not are_services_initialized():
+        logger.info("Initializing conversation services in REST server...")
+        await initialize_services()
+    else:
+        logger.debug(
+            "Conversation services already initialized, skipping REST server initialization"
+        )
     yield
 
 
@@ -52,9 +59,7 @@ async def update_conversation_response(req: UpdateConversationRequest):
         await qdrant_conversation_manager.update_conversation_response(
             message_id=req.message_id, new_response=req.response
         )
-        logger.info(
-            f"Updated response in Qdrant for message_id: {req.message_id}"
-        )
+        logger.info(f"Updated response in Qdrant for message_id: {req.message_id}")
     except Exception as e:
         logger.warning(f"Failed to update Qdrant for message_id {req.message_id}: {e}")
         # Don't fail the request if only Qdrant update fails

@@ -72,6 +72,7 @@ class ConversationHistoryService:
         self.embedding_model = None
         self.redis_url = None
         self.collection_name = "conversation_history"
+        self._initialized = False  # Add initialization flag
 
         # Configuration
         self.max_redis_messages = 50  # Recent messages in Redis
@@ -83,6 +84,11 @@ class ConversationHistoryService:
 
     async def initialize(self):
         """Initialize Redis and Qdrant connections"""
+        # Check if already initialized
+        if self._initialized:
+            logger.debug("Conversation history service already initialized, skipping")
+            return
+
         try:
             # Avoid tokenizer multiprocessing which can leak semaphores on macOS
             import os
@@ -116,6 +122,8 @@ class ConversationHistoryService:
                 logger.info("Embedding model loaded successfully")
             except Exception as e:
                 logger.warning(f"Could not load embedding model: {e}")
+
+            self._initialized = True
 
         except Exception as e:
             logger.error(f"Failed to initialize conversation history service: {e}")

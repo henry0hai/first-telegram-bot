@@ -82,6 +82,7 @@ class QdrantConversationManager:
         self.embedding_model = None
         self.collection_name = "conversation_history_v2"  # Enhanced collection
         self.legacy_collection = "conversation_history"  # Original collection
+        self._initialized = False  # Add initialization flag
 
         # Enhanced configuration for MCP server compatibility
         self.vector_size = 384  # MiniLM model dimension
@@ -89,6 +90,13 @@ class QdrantConversationManager:
 
     async def initialize(self):
         """Initialize Qdrant with enhanced schema"""
+        # Check if already initialized
+        if self._initialized:
+            logger.debug(
+                "Enhanced Qdrant conversation manager already initialized, skipping"
+            )
+            return
+
         try:
             # Initialize Qdrant client
             if config.qdrant_api_url:
@@ -110,6 +118,8 @@ class QdrantConversationManager:
                 logger.info("Embedding model loaded for enhanced storage")
             except Exception as e:
                 logger.warning(f"Could not load embedding model: {e}")
+
+            self._initialized = True
 
         except Exception as e:
             logger.error(f"Failed to initialize enhanced Qdrant manager: {e}")

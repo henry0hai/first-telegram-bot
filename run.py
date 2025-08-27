@@ -5,6 +5,7 @@ import sys
 from src.core.mcp_bot import main as bot_main
 import uvicorn
 from src.rest_server import app as rest_app
+from src.services.initialization import initialize_services
 
 
 class RestServer:
@@ -43,6 +44,11 @@ async def main():
     rest_task = None
 
     try:
+        # Initialize services once at startup
+        print("🔧 Initializing conversation services...")
+        await initialize_services()
+        print("✅ Conversation services initialized")
+
         # Create tasks for both services
         bot_task = asyncio.create_task(bot_main())
         rest_task = asyncio.create_task(rest_server.start_server())
