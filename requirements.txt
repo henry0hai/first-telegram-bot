@@ -38,3 +38,6 @@ redis==5.0.1
 qdrant-client==1.9.1
 sentence-transformers==2.7.0
 numpy==1.26.4
+spacy==3.7.5
+networkx==3.3
+torch==2.3.1

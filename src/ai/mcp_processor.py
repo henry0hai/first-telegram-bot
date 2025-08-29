@@ -1,289 +1,78 @@
 # src/ai/mcp_ai.py
 import re
-from enum import Enum
 from typing import Dict, List, Optional, Tuple
 from src.utils.logging_utils import get_logger
 from src.ai.mcp_instructions import (
-    get_mcp_instructions,
-    get_intent_guidance,
     get_intent_specific_instructions,
 )
+from src.ai.semantic_intent_detector import SemanticIntentDetector
+from src.ai.intent_models import IntentType
 
 logger = get_logger(__name__)
-
-
-class IntentType(Enum):
-    """Intent types for MCP AI processing"""
-
-    RAG_QUERY = "rag_query"
-    SEARCH_QUERY = "search_query"
-    SYSTEM_INFO = "system_info"
-    DYNAMIC_TOOL = "dynamic_tool"
-    WEATHER = "weather"
-    BUDGET_FINANCE = "budget_finance"
-    EMAIL_COMMUNICATION = "email_communication"
-    TRANSLATION_LANGUAGE = "translation_language"
-    TASK_SCHEDULER = "task_scheduler"
-    UNKNOWN = "unknown"
 
 
 class MCPAIProcessor:
     """Pre-processor for MCP AI to detect context and intent"""
 
     def __init__(self):
-        # Keywords for different intent types
+        self.semantic_intent_detector = SemanticIntentDetector()
+        # Keywords for different intent types (used as a fallback)
         self.rag_keywords = [
-            "document",
-            "file",
-            "pdf",
-            "content",
-            "uploaded",
-            "analyze",
-            "summarize",
-            "explain",
-            "what does",
-            "according to",
-            "based on",
-            "from the document",
-            "in the file",
-            "mcp",
+            "document", "file", "pdf", "content", "uploaded", "analyze", "summarize", "explain",
+            "what does", "according to", "based on", "from the document", "in the file", "mcp",
             "model context protocol",
         ]
-
         self.search_keywords = [
-            "search",
-            "google",
-            "find",
-            "look up",
-            "latest",
-            "news",
-            "recent",
-            "current",
-            "what's new",
-            "developments",
-            "updates",
-            "trending",
+            "search", "google", "find", "look up", "latest", "news", "recent", "current",
+            "what's new", "developments", "updates", "trending",
         ]
-
         self.system_keywords = [
-            "system",
-            "hardware",
-            "cpu",
-            "memory",
-            "ram",
-            "disk",
-            "server",
-            "specifications",
-            "performance",
-            "resources",
-            "capacity",
-            "status",
-            "system status",
+            "system", "hardware", "cpu", "memory", "ram", "disk", "server", "specifications",
+            "performance", "resources", "capacity", "status", "system status",
         ]
-
         self.weather_keywords = [
-            "weather",
-            "temperature",
-            "rain",
-            "sunny",
-            "cloudy",
-            "forecast",
-            "climate",
-            "hot",
-            "cold",
-            "snow",
-            "wind",
-            "humidity",
+            "weather", "temperature", "rain", "sunny", "cloudy", "forecast", "climate", "hot",
+            "cold", "snow", "wind", "humidity",
         ]
-
-        # New keyword categories for additional MCP servers
         self.budget_keywords = [
-            "budget",
-            "expense",
-            "income",
-            "money",
-            "cost",
-            "spend",
-            "spending",
-            "save",
-            "saving",
-            "financial",
-            "finance",
-            "bill",
-            "payment",
-            "salary",
-            "revenue",
-            "profit",
-            "loss",
-            "investment",
-            "bank",
-            "account",
-            "transaction",
-            "balance",
-            "summary",
-            "overview",
-            "report",
-            "check my",
-            "current balance",
-            "budget balance",
-            "budget summary",
-            "financial status",
-            "how much",
-            "total spent",
-            "monthly budget",
-            "expenses",
-            "incomes",
-            "categorize",
-            "category",
-            "tracking",
-            "track",
+            "budget", "expense", "income", "money", "cost", "spend", "spending", "save", "saving",
+            "financial", "finance", "bill", "payment", "salary", "revenue", "profit", "loss",
+            "investment", "bank", "account", "transaction", "balance", "summary", "overview",
+            "report", "check my", "current balance", "budget balance", "budget summary",
+            "financial status", "how much", "total spent", "monthly budget", "expenses", "incomes",
+            "categorize", "category", "tracking", "track",
         ]
-
         self.email_keywords = [
-            "email",
-            "mail",
-            "send",
-            "message",
-            "compose",
-            "reply",
-            "forward",
-            "inbox",
-            "outbox",
-            "contact",
-            "recipient",
-            "subject",
-            "attachment",
-            "correspondence",
-            "communication",
-            "letter",
-            "notify",
-            "notification",
+            "email", "mail", "send", "message", "compose", "reply", "forward", "inbox", "outbox",
+            "contact", "recipient", "subject", "attachment", "correspondence", "communication",
+            "letter", "notify", "notification",
         ]
-
         self.translation_keywords = [
-            "translate",
-            "translation",
-            "language",
-            "english",
-            "spanish",
-            "french",
-            "chinese",
-            "japanese",
-            "german",
-            "italian",
-            "portuguese",
-            "russian",
-            "arabic",
-            "hindi",
-            "korean",
-            "convert",
-            "interpret",
-            "multilingual",
+            "translate", "translation", "language", "english", "spanish", "french", "chinese",
+            "japanese", "german", "italian", "portuguese", "russian", "arabic", "hindi", "korean",
+            "convert", "interpret", "multilingual",
         ]
-
-        # New keyword category for task scheduler
         self.scheduler_keywords = [
-            "alarm",
-            "remind",
-            "reminder",
-            "schedule",
-            "notify",
-            "notification",
-            "alert",
-            "timer",
-            "after",
-            "every",
-            "recurring",
-            "repeat",
-            "set",
-            "create",
-            "cancel task",
-            "list tasks",
-            "my tasks",
-            "wake me",
-            "stand up",
-            "take water",
-            "break",
-            "meeting",
-            "appointment",
-            "deadline",
-            "in 20 seconds",
-            "in 30 minutes",
-            "every 25 mins",
-            "after 30 seconds",
-            "next week at",
-            "tomorrow at",
-            "at 9:00",
-            "weekly",
-            "daily",
-            "hourly",
+            "alarm", "remind", "reminder", "schedule", "notify", "notification", "alert", "timer",
+            "after", "every", "recurring", "repeat", "set", "create", "cancel task", "list tasks",
+            "my tasks", "wake me", "stand up", "take water", "break", "meeting", "appointment",
+            "deadline", "in 20 seconds", "in 30 minutes", "every 25 mins", "after 30 seconds",
+            "next week at", "tomorrow at", "at 9:00", "weekly", "daily", "hourly",
         ]
-
-        # New keyword category for dynamic tool creation
         self.dynamic_tool_keywords = [
-            "create script",
-            "create a script",
-            "create a simple script",
-            "create simple python app",
-            "create python",
-            "create a python",
-            "create python script",
-            "create a python script",
-            "generate code",
-            "write script",
-            "write a script",
-            "write python",
-            "write a python",
-            "make a script",
-            "make script",
-            "build a script",
-            "build script",
-            "develop a script",
-            "develop script",
-            "automation",
-            "automate",
-            "automate server",
-            "automate system",
-            "server automation",
-            "system automation",
-            "execute script",
-            "run script",
-            "bash script",
-            "python script",
-            "shell command",
-            "command line",
-            "server script",
-            "system script",
-            "file creation",
-            "generate file",
-            "create file",
-            "write file",
-            "make file",
-            "script generation",
-            "code generation",
-            "dynamic script",
-            "custom script",
-            "tool creation",
-            "create tool",
-            "build script",
-            "develop script",
-            "programming",
-            "scripting",
-            "generate bash",
-            "generate python",
-            "create bash",
-            "create python",
-            "write bash",
-            "write python",
-            "simple script",
-            "custom tool",
-            "script to",
-            "code to",
-            "program to",
-            "python to",
-            "python program",
-            "math script",
-            "calculation script",
+            "create script", "create a script", "create a simple script", "create simple python app",
+            "create python", "create a python", "create python script", "create a python script",
+            "generate code", "write script", "write a script", "write python", "write a python",
+            "make a script", "make script", "build a script", "build script", "develop a script",
+            "develop script", "automation", "automate", "automate server", "automate system",
+            "server automation", "system automation", "execute script", "run script", "bash script",
+            "python script", "shell command", "command line", "server script", "system script",
+            "file creation", "generate file", "create file", "write file", "make file",
+            "script generation", "code generation", "dynamic script", "custom script",
+            "tool creation", "create tool", "build script", "develop script", "programming",
+            "scripting", "generate bash", "generate python", "create bash", "create python",
+            "write bash", "write python", "simple script", "custom tool", "script to", "code to",
+            "program to", "python to", "python program", "math script", "calculation script",
         ]
 
         # Location patterns for weather queries
@@ -303,20 +92,15 @@ class MCPAIProcessor:
             match = re.search(pattern, text_lower)
             if match:
                 location = match.group(1).strip()
-                # Clean up common words that might be captured
                 location = re.sub(r"\b(the|a|an|in|for|at)\b", "", location).strip()
                 if location:
                     return location.title()
-
         return None
 
     def _detect_scheduler_type(self, text_lower: str) -> str:
         """Detect the type of scheduler request"""
-        # Use word boundaries and concrete patterns to avoid false positives like "every" in "everyone"
-        # Cancel operations first
         if re.search(r"\b(cancel|remove|delete|stop)\b", text_lower):
             return "cancel"
-        # Only match 'list tasks', 'my tasks', or 'show my tasks' for list
         if (
             re.search(r"\blist (my )?tasks\b", text_lower)
             or re.search(r"\bshow (me )?my tasks\b", text_lower)
@@ -325,8 +109,6 @@ class MCPAIProcessor:
             or re.search(r"\blist tasks\b", text_lower)
         ):
             return "list"
-
-        # Recurring reminder (e.g., "every 25 minutes", "remind me every hour")
         if re.search(r"\bevery\b", text_lower) and re.search(
             r"\b(second|seconds|minute|minutes|hour|hours|day|days|week|weeks)\b",
             text_lower,
@@ -334,229 +116,148 @@ class MCPAIProcessor:
             return "reminder"
         if re.search(r"\b(remind|recurring|repeat)\b", text_lower):
             return "reminder"
-
-        # Alarm: after/in X time or explicit "alarm"/"wake me"
         if re.search(r"\balarm\b|\bwake\s+me\b", text_lower) or re.search(
             r"\b(after|in)\s+\d+\s*(second|seconds|minute|minutes|hour|hours)\b",
             text_lower,
         ):
             return "alarm"
-
-        # Notification with absolute time (avoid bare 'at')
         if re.search(r"\b(next\s+week|tomorrow)\b", text_lower):
             return "notification"
         if re.search(r"\bat\s+\d{1,2}(:\d{2})?\s*(am|pm)?\b", text_lower):
             return "notification"
-
         return "unknown"
 
     def _detect_tool_type(self, text_lower: str) -> str:
         """Detect the type of dynamic tool request"""
-        if any(
-            word in text_lower
-            for word in ["bash", "shell", "command line", "bash script"]
-        ):
+        if any(word in text_lower for word in ["bash", "shell", "command line", "bash script"]):
             return "bash"
         elif any(word in text_lower for word in ["python", "py", "python script"]):
             return "python"
-        elif any(
-            word in text_lower
-            for word in ["create file", "generate file", "write file", "make file"]
-        ):
+        elif any(word in text_lower for word in ["create file", "generate file", "write file", "make file"]):
             return "file_creation"
-        elif any(
-            word in text_lower
-            for word in ["automation", "automate", "script generation"]
-        ):
+        elif any(word in text_lower for word in ["automation", "automate", "script generation"]):
             return "automation"
-        elif any(
-            word in text_lower
-            for word in ["execute", "run", "execute script", "run script"]
-        ):
+        elif any(word in text_lower for word in ["execute", "run", "execute script", "run script"]):
             return "execution"
         else:
             return "auto"
 
     def detect_intent(self, text: str) -> Tuple[IntentType, Dict]:
         """
-        Detect the intent of user input and extract relevant context
-
-        Returns:
-            Tuple of (IntentType, context_dict)
+        Detect the intent of user input and extract relevant context.
+        Uses semantic similarity if available, otherwise falls back to keyword matching.
         """
         text_lower = text.lower()
         context = {}
 
-        # Count keyword matches for each intent type
-        rag_score = sum(1 for keyword in self.rag_keywords if keyword in text_lower)
-        search_score = sum(
-            1 for keyword in self.search_keywords if keyword in text_lower
-        )
-        system_score = sum(
-            1 for keyword in self.system_keywords if keyword in text_lower
-        )
-        weather_score = sum(
-            1 for keyword in self.weather_keywords if keyword in text_lower
-        )
-        budget_score = sum(
-            1 for keyword in self.budget_keywords if keyword in text_lower
-        )
-        email_score = sum(1 for keyword in self.email_keywords if keyword in text_lower)
-        translation_score = sum(
-            1 for keyword in self.translation_keywords if keyword in text_lower
-        )
+        if self.semantic_intent_detector.st_available:
+            # Use semantic similarity for intent detection
+            scores = self.semantic_intent_detector.calculate_intent_scores(text_lower)
+            logger.info(f"Semantic intent scores: { {k.value: f'{v:.2f}' for k, v in scores.items()} }")
+        else:
+            # Fallback to keyword matching
+            logger.warning("Using keyword matching as a fallback for intent detection.")
+            scores = {
+                IntentType.RAG_QUERY: sum(1 for keyword in self.rag_keywords if keyword in text_lower),
+                IntentType.SEARCH_QUERY: sum(1 for keyword in self.search_keywords if keyword in text_lower),
+                IntentType.SYSTEM_INFO: sum(1 for keyword in self.system_keywords if keyword in text_lower),
+                IntentType.DYNAMIC_TOOL: sum(1 for keyword in self.dynamic_tool_keywords if keyword in text_lower),
+                IntentType.WEATHER: sum(1 for keyword in self.weather_keywords if keyword in text_lower),
+                IntentType.BUDGET_FINANCE: sum(1 for keyword in self.budget_keywords if keyword in text_lower),
+                IntentType.EMAIL_COMMUNICATION: sum(1 for keyword in self.email_keywords if keyword in text_lower),
+                IntentType.TRANSLATION_LANGUAGE: sum(1 for keyword in self.translation_keywords if keyword in text_lower),
+            }
 
-        # Scheduler is special: use the concrete type detector to avoid substring false positives
+        # Scheduler is a special case, always use regex for it and override score
         scheduler_type = self._detect_scheduler_type(text_lower)
-        scheduler_score = 1 if scheduler_type != "unknown" else 0
+        if scheduler_type != "unknown":
+            scores[IntentType.TASK_SCHEDULER] = 1.0  # High confidence for regex match
+        elif IntentType.TASK_SCHEDULER not in scores:
+             scores[IntentType.TASK_SCHEDULER] = 0.0
 
-        dynamic_tool_score = sum(
-            1 for keyword in self.dynamic_tool_keywords if keyword in text_lower
-        )
 
-        logger.info(
-            f"Intent scores - RAG: {rag_score}, Search: {search_score}, System: {system_score}, Weather: {weather_score}, Budget: {budget_score}, Email: {email_score}, Translation: {translation_score}, Scheduler: {scheduler_score}, Dynamic Tool: {dynamic_tool_score}"
-        )
+        max_score = max(scores.values()) if scores else 0
 
-        # Determine intent based on highest score with priority-based tie-breaking
-        scores = {
-            IntentType.RAG_QUERY: rag_score,
-            IntentType.SEARCH_QUERY: search_score,
-            IntentType.SYSTEM_INFO: system_score,
-            IntentType.DYNAMIC_TOOL: dynamic_tool_score,
-            IntentType.WEATHER: weather_score,
-            IntentType.BUDGET_FINANCE: budget_score,
-            IntentType.EMAIL_COMMUNICATION: email_score,
-            IntentType.TRANSLATION_LANGUAGE: translation_score,
-            IntentType.TASK_SCHEDULER: scheduler_score,
-        }
-
-        max_score = max(scores.values())
-
-        if max_score == 0:
+        if max_score < 0.3:  # Confidence threshold for semantic search
             # Default to RAG if no clear intent
-            return IntentType.RAG_QUERY, {"query": text, "reason": "default_fallback"}
+            return IntentType.RAG_QUERY, {"query": text, "reason": "default_fallback_low_confidence"}
 
-        # Get all intents with the highest score
         top_intents = [intent for intent, score in scores.items() if score == max_score]
 
-        # Priority order for tie-breaking (RAG first per user preference)
         priority_order = [
-            IntentType.RAG_QUERY,  # Highest priority per user preference for ties
-            IntentType.DYNAMIC_TOOL,  # High priority for script creation
-            IntentType.TASK_SCHEDULER,  # High priority for scheduling
-            IntentType.WEATHER,  # Specific domain
-            IntentType.BUDGET_FINANCE,  # Specific domain
-            IntentType.SYSTEM_INFO,  # Specific domain
-            IntentType.EMAIL_COMMUNICATION,  # Specific domain
-            IntentType.TRANSLATION_LANGUAGE,  # Specific domain
-            IntentType.SEARCH_QUERY,  # More general
+            IntentType.RAG_QUERY,
+            IntentType.DYNAMIC_TOOL,
+            IntentType.TASK_SCHEDULER,
+            IntentType.WEATHER,
+            IntentType.BUDGET_FINANCE,
+            IntentType.SYSTEM_INFO,
+            IntentType.EMAIL_COMMUNICATION,
+            IntentType.TRANSLATION_LANGUAGE,
+            IntentType.SEARCH_QUERY,
         ]
 
-        # Select the highest priority intent among tied scores
         for priority_intent in priority_order:
             if priority_intent in top_intents:
                 intent = priority_intent
                 break
         else:
-            # Fallback if somehow no match (shouldn't happen)
             intent = top_intents[0]
 
         # Extract additional context based on intent
-        # Add available MCP tools for each intent
         if intent == IntentType.WEATHER:
             location = self.extract_location(text)
             context = {
                 "query": text,
                 "location": location,
-                "extracted_keywords": [
-                    kw for kw in self.weather_keywords if kw in text_lower
-                ],
+                "extracted_keywords": [kw for kw in self.weather_keywords if kw in text_lower],
                 "mcp_tools": [{"tool": "get_weather", "parameters": ["location"]}],
             }
         elif intent == IntentType.SYSTEM_INFO:
             context = {
                 "query": text,
-                "extracted_keywords": [
-                    kw for kw in self.system_keywords if kw in text_lower
-                ],
+                "extracted_keywords": [kw for kw in self.system_keywords if kw in text_lower],
                 "mcp_tools": [{"tool": "system_info", "parameters": []}],
             }
         elif intent == IntentType.DYNAMIC_TOOL:
             context = {
                 "query": text,
-                "extracted_keywords": [
-                    kw for kw in self.dynamic_tool_keywords if kw in text_lower
-                ],
+                "extracted_keywords": [kw for kw in self.dynamic_tool_keywords if kw in text_lower],
                 "tool_type": self._detect_tool_type(text_lower),
-                "mcp_tools": [
-                    {
-                        "tool": "generic_tool_creation",
-                        "parameters": [
-                            "user_request",
-                            "preferred_language",
-                            "send_to_telegram",
-                            "chat_id",
-                        ],
-                    }
-                ],
+                "mcp_tools": [{"tool": "generic_tool_creation", "parameters": ["user_request", "preferred_language", "send_to_telegram", "chat_id"]}],
             }
         elif intent == IntentType.SEARCH_QUERY:
             context = {
                 "query": text,
-                "search_terms": text,  # The full text as search terms
-                "extracted_keywords": [
-                    kw for kw in self.search_keywords if kw in text_lower
-                ],
+                "search_terms": text,
+                "extracted_keywords": [kw for kw in self.search_keywords if kw in text_lower],
                 "mcp_tools": [{"tool": "search_google", "parameters": ["query"]}],
             }
         elif intent == IntentType.BUDGET_FINANCE:
             context = {
                 "query": text,
-                "extracted_keywords": [
-                    kw for kw in self.budget_keywords if kw in text_lower
-                ],
+                "extracted_keywords": [kw for kw in self.budget_keywords if kw in text_lower],
                 "mcp_tools": [
                     {"tool": "get_budget_summary", "parameters": []},
-                    {
-                        "tool": "add_expense",
-                        "parameters": ["amount", "category", "note"],
-                    },
+                    {"tool": "add_expense", "parameters": ["amount", "category", "note"]},
                     {"tool": "add_income", "parameters": ["amount", "source", "note"]},
                 ],
             }
         elif intent == IntentType.EMAIL_COMMUNICATION:
             context = {
                 "query": text,
-                "extracted_keywords": [
-                    kw for kw in self.email_keywords if kw in text_lower
-                ],
-                "mcp_tools": [
-                    {
-                        "tool": "send_email",
-                        "parameters": ["to", "subject", "body", "attachments"],
-                    }
-                ],
+                "extracted_keywords": [kw for kw in self.email_keywords if kw in text_lower],
+                "mcp_tools": [{"tool": "send_email", "parameters": ["to", "subject", "body", "attachments"]}],
             }
         elif intent == IntentType.TRANSLATION_LANGUAGE:
             context = {
                 "query": text,
-                "extracted_keywords": [
-                    kw for kw in self.translation_keywords if kw in text_lower
-                ],
-                "mcp_tools": [
-                    {
-                        "tool": "translate_text",
-                        "parameters": ["text", "target_language"],
-                    }
-                ],
+                "extracted_keywords": [kw for kw in self.translation_keywords if kw in text_lower],
+                "mcp_tools": [{"tool": "translate_text", "parameters": ["text", "target_language"]}],
             }
         elif intent == IntentType.TASK_SCHEDULER:
             context = {
                 "query": text,
-                "extracted_keywords": [
-                    kw for kw in self.scheduler_keywords if kw in text_lower
-                ],
+                "extracted_keywords": [kw for kw in self.scheduler_keywords if kw in text_lower],
                 "scheduler_type": scheduler_type,
                 "mcp_tools": [
                     {"tool": "create_alarm", "parameters": ["time", "message"]},
@@ -567,50 +268,35 @@ class MCPAIProcessor:
         else:  # RAG_QUERY or fallback
             context = {
                 "query": text,
-                "extracted_keywords": [
-                    kw for kw in self.rag_keywords if kw in text_lower
-                ],
-                "mcp_tools": [
-                    {"tool": "rag_query", "parameters": ["query", "document_id"]}
-                ],
+                "extracted_keywords": [kw for kw in self.rag_keywords if kw in text_lower],
+                "mcp_tools": [{"tool": "rag_query", "parameters": ["query", "document_id"]}],
             }
 
         return intent, context
 
     def prepare_mcp_prompt(
-        self, intent: IntentType, context: Dict, original_query: str
+        self,
+        intent: IntentType,
+        context: Dict,
+        original_query: str,
     ) -> str:
         """
         Prepare a structured prompt for the MCP AI based on detected intent
         Returns only instructions relevant to the specific intent
         """
-        # Get intent-specific instructions (only relevant tools)
         intent_instructions = get_intent_specific_instructions(intent.value)
-
-        # Add context-specific hints
         context_hint = ""
 
-        # Add location hint for weather queries if available
         if intent == IntentType.WEATHER and context.get("location"):
             context_hint = f" (Location detected: {context.get('location')})"
-            intent_instructions = intent_instructions.replace(
-                "[location name]", context.get("location")
-            )
+            intent_instructions = intent_instructions.replace("[location name]", context.get("location"))
 
         user_query = f"\n** USER QUERY **\n{original_query}{context_hint}\n"
-
         return intent_instructions + user_query
 
     def process_query(self, text: str) -> Dict:
         """
         Main processing function that combines intent detection and prompt preparation
-
-        Returns:
-            Dictionary containing:
-            - intent: IntentType
-            - context: Dict with extracted context
-            - mcp_prompt: Prepared prompt for MCP AI
-            - original_query: Original user input
         """
         intent, context = self.detect_intent(text)
         mcp_prompt = self.prepare_mcp_prompt(intent, context, text)
@@ -633,11 +319,5 @@ mcp_processor = MCPAIProcessor()
 def process_for_mcp_ai(user_input: str) -> Dict:
     """
     Process user input for MCP AI integration
-
-    Args:
-        user_input: Raw user input text
-
-    Returns:
-        Dictionary with processed information for MCP AI
     """
     return mcp_processor.process_query(user_input)

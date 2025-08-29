@@ -5,7 +5,8 @@ from typing import Tuple
 from telegram import Update
 from telegram.ext import ContextTypes
 from config.config import config
-from src.ai.mcp_processor import process_for_mcp_ai, IntentType
+from src.ai.mcp_processor import MCPAIProcessor
+from src.ai.intent_models import IntentType
 from src.ai.mcp_request_preprocessor import preprocess_for_mcp_server
 from src.handlers.scheduler_handler import handle_scheduler_command
 from src.handlers.conversation_commands import handle_clear_intent_in_message
@@ -21,6 +22,7 @@ timestamp = datetime.now(timezone.utc)
 CONFIDENCE_CONTEXT_THRESHOLD = 0.3  # Threshold for using conversation context
 logger = get_logger(__name__)
 
+mcp_processor = MCPAIProcessor()
 
 # MCP-enhanced text handler
 async def handle_mcp_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -96,7 +98,7 @@ async def handle_mcp_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
         # Process with MCP AI preprocessing (using enhanced input for better context awareness)
-        mcp_result = process_for_mcp_ai(enhanced_input)
+        mcp_result = mcp_processor.process_query(enhanced_input)
         # But keep original user input in the result for webhook
         mcp_result["original_user_input"] = user_input
 
